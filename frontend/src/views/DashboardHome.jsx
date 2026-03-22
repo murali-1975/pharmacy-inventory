@@ -1,0 +1,67 @@
+import React from 'react';
+import { Package, Building2, TrendingUp, AlertCircle } from 'lucide-react';
+import { StatCard } from '../components/common/Common';
+
+const DashboardHome = ({ setView }) => (
+  <>
+    {/* Stats Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <StatCard icon={Package} label="Total Medicines" value="248" trend={12} color="bg-blue-500" subValue="items" />
+      <StatCard icon={Building2} label="Active Suppliers" value="16" trend={0} color="bg-indigo-500" subValue="vendors" />
+      <StatCard icon={TrendingUp} label="Monthly Procurement" value="₹1,45,210" trend={8.2} color="bg-green-500" />
+      <StatCard icon={AlertCircle} label="Low Stock Alert" value="24" trend={-2} color="bg-orange-500" />
+    </div>
+
+    {/* Recent Activities & Quick Actions */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-bold">Recent Invoices</h2>
+          <button 
+            onClick={() => setView('Invoices')}
+            className="text-sm text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+          >
+            View All
+          </button>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">INV-2024-00{i}</p>
+                  <p className="text-xs text-gray-500">2 hours ago</p>
+                </div>
+              </div>
+              <p className="font-bold text-gray-900">₹4,250.00</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-blue-600 p-6 rounded-2xl shadow-xl shadow-blue-100 text-white relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-lg font-bold mb-2">Quick Actions</h2>
+          <p className="text-blue-100 text-sm mb-6">Manage your pharmacy inventory efficiently.</p>
+          <div className="space-y-3">
+            <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl font-semibold transition-colors flex items-center justify-center space-x-2">
+              <span>Add New Product</span>
+            </button>
+            <button 
+              onClick={() => setView('Suppliers')}
+              className="w-full bg-white text-blue-600 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-blue-700/20"
+            >
+              Manage Suppliers
+            </button>
+          </div>
+        </div>
+        <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+      </div>
+    </div>
+  </>
+);
+
+export default DashboardHome;
