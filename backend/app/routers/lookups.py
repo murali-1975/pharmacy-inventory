@@ -1,9 +1,14 @@
+"""
+Lookup Tables Router.
+Manages auxiliary master data used for dropdowns and classification (Status, Supplier Types).
+Access: All authenticated users (Read), Admin (Create/Update/Delete).
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, database, auth, schemas
-from ..core.logging_config import logger
+from app import models, database, auth, schemas
+from app.core.logging_config import logger
 
 router = APIRouter(tags=["Lookups"])
 
@@ -19,13 +24,17 @@ def get_status(
     include_inactive: bool = False
 ):
     """
-    List all available statuses. 
-    By default, only active statuses are returned for non-admins.
+    List all available statuses for users and suppliers.
+    Filters: By default, non-admins only see active statuses.
     """
-    query = db.query(models.Status)
-    if not include_inactive and current_user.role != "Admin":
-        query = query.filter(models.Status.is_active == True)
-    return query.all()
+    try:
+        query = db.query(models.Status)
+        if not include_inactive and current_user.role != "Admin":
+            query = query.filter(models.Status.is_active == True)
+        return query.all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during status retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve statuses from database")
 
 @router.post("/status/", response_model=schemas.StatusSchema)
 @router.post("/status", response_model=schemas.StatusSchema, include_in_schema=False)
@@ -35,7 +44,8 @@ def create_status(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Create a new status entry. Restricted to Admins.
+    Create a new status entry.
+    Requires: Admin role.
     """
     try:
         db_status = models.Status(name=status_in.name)
@@ -58,7 +68,8 @@ def update_status(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Update a status name. Restricted to Admins.
+    Update a status name.
+    Requires: Admin role.
     """
     try:
         db_status = db.query(models.Status).filter(models.Status.id == status_id).first()
@@ -86,9 +97,9 @@ def delete_status(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Delete a status. 
-    If referenced by users or suppliers, only soft delete (deactivation) is allowed, 
-    unless explicitly overridden or if the status is currently unused.
+    Delete a status.
+    Requires: Admin role.
+    Security: If referenced by users or suppliers, only soft delete (deactivation) is allowed to maintain referential integrity.
     """
     try:
         db_status = db.query(models.Status).filter(models.Status.id == status_id).first()
@@ -96,7 +107,7 @@ def delete_status(
             logger.warning(f"Status deletion failed: ID {status_id} not found.")
             raise HTTPException(status_code=404, detail="Status not found")
         
-        # Check references
+        # Check references (referential integrity check)
         user_count = db.query(models.User).filter(models.User.status_id == status_id).count()
         supplier_count = db.query(models.Supplier).filter(models.Supplier.status_id == status_id).count()
         total_refs = user_count + supplier_count
@@ -138,13 +149,16 @@ def get_supplier_types(
     include_inactive: bool = False
 ):
     """
-    List all supplier types. 
-    By default, only active types are returned for non-admins.
+    List all supplier types.
     """
-    query = db.query(models.SupplierType)
-    if not include_inactive and current_user.role != "Admin":
-        query = query.filter(models.SupplierType.is_active == True)
-    return query.all()
+    try:
+        query = db.query(models.SupplierType)
+        if not include_inactive and current_user.role != "Admin":
+            query = query.filter(models.SupplierType.is_active == True)
+        return query.all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during supplier types retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve supplier types from database")
 
 @router.post("/supplier-types/", response_model=schemas.SupplierTypeSchema)
 @router.post("/supplier-types", response_model=schemas.SupplierTypeSchema, include_in_schema=False)
@@ -154,7 +168,8 @@ def create_supplier_type(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Create a new supplier type. Restricted to Admins.
+    Create a new supplier type.
+    Requires: Admin role.
     """
     try:
         db_type = models.SupplierType(name=type_in.name)
@@ -177,7 +192,8 @@ def update_supplier_type(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Update a supplier type name. Restricted to Admins.
+    Update a supplier type name.
+    Requires: Admin role.
     """
     try:
         db_type = db.query(models.SupplierType).filter(models.SupplierType.id == type_id).first()
@@ -205,9 +221,9 @@ def delete_supplier_type(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Delete a supplier type. 
-    If referenced by suppliers, only soft delete (deactivation) is allowed, 
-    unless explicitly overridden or if the type is currently unused.
+    Delete a supplier type.
+    Requires: Admin role.
+    Security: If referenced by suppliers, only soft delete (deactivation) is allowed.
     """
     try:
         db_type = db.query(models.SupplierType).filter(models.SupplierType.id == type_id).first()
@@ -215,7 +231,7 @@ def delete_supplier_type(
             logger.warning(f"Supplier type deletion failed: ID {type_id} not found.")
             raise HTTPException(status_code=404, detail="Supplier type not found")
         
-        # Check references
+        # Check references (referential integrity check)
         supplier_count = db.query(models.Supplier).filter(models.Supplier.type_id == type_id).count()
         
         if supplier_count > 0 and not soft:

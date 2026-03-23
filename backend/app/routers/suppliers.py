@@ -1,9 +1,14 @@
+"""
+Supplier Management Router.
+Handles CRUD operations for suppliers, including their associated contact and bank details.
+Access: All authenticated users (Read), Admin/Manager (Create/Update), Admin (Delete).
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, database, auth, schemas
-from ..core.logging_config import logger
+from app import models, database, auth, schemas
+from app.core.logging_config import logger
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
@@ -14,9 +19,13 @@ admin_required = auth.RoleChecker(["Admin"])
 @router.get("", response_model=List[schemas.SupplierSchema], include_in_schema=False)
 def get_suppliers(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     """
-    List all suppliers. Accessible by any authenticated user.
+    List all suppliers and their primary details.
     """
-    return db.query(models.Supplier).all()
+    try:
+        return db.query(models.Supplier).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during suppliers retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve suppliers from database")
 
 @router.post("/", response_model=schemas.SupplierSchema)
 @router.post("", response_model=schemas.SupplierSchema, include_in_schema=False)
@@ -26,7 +35,8 @@ def create_supplier(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Create a new supplier with contact and bank details. Restricted to Admin/Manager.
+    Create a new supplier with optional nested contact and bank details.
+    Requires: Admin or Manager role.
     """
     try:
         db_supplier = models.Supplier(
@@ -35,7 +45,7 @@ def create_supplier(
             status_id=supplier_in.status_id
         )
         db.add(db_supplier)
-        db.flush() # Get ID for relationships
+        db.flush() # Secure ID for sub-record linking
 
         if supplier_in.contact_details:
             db_contact = models.SupplierContactDetail(
@@ -70,7 +80,9 @@ def update_supplier(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Update an existing supplier and its associated details. Restricted to Admin/Manager.
+    Update an existing supplier and its associated details.
+    Requires: Admin or Manager role.
+    Logic: Syncs contact details and rebuilds bank account list.
     """
     try:
         db_supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
@@ -82,7 +94,7 @@ def update_supplier(
         db_supplier.type_id = supplier_in.type_id
         db_supplier.status_id = supplier_in.status_id
 
-        # Update contact
+        # Update contact record
         if supplier_in.contact_details:
             if db_supplier.contact_details:
                 for key, val in supplier_in.contact_details.model_dump().items():
@@ -94,7 +106,7 @@ def update_supplier(
                 )
                 db.add(db_contact)
 
-        # Update bank details (re-sync: delete old and add new)
+        # Update bank details (Full sync: purge matches and re-insert)
         db.query(models.SupplierBankAccount).filter(models.SupplierBankAccount.supplier_id == supplier_id).delete()
         for bank_data in supplier_in.bank_details:
             if bank_data.bank_name.strip() or bank_data.account_number.strip():
@@ -121,7 +133,8 @@ def delete_supplier(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Delete a supplier. Restricted to Admin.
+    Permanently delete a supplier and all its associated records (cascade delete).
+    Requires: Admin role.
     """
     try:
         db_supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()

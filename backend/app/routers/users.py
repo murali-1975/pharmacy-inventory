@@ -1,9 +1,14 @@
+"""
+User Management Router.
+Handles administrative operations for system users, including role assignment and password resets.
+Access: Restricted to users with the 'Admin' role.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, database, auth, schemas
-from ..core.logging_config import logger
+from app import models, schemas, database, auth
+from app.core.logging_config import logger
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -16,9 +21,14 @@ def get_users(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    List all users in the system. Restricted to Admins.
+    List all registered users in the system.
+    Requires: Admin role.
     """
-    return db.query(models.User).all()
+    try:
+        return db.query(models.User).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during users retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve users from database")
 
 @router.post("/", response_model=schemas.UserSchema)
 @router.post("", response_model=schemas.UserSchema, include_in_schema=False)
@@ -28,7 +38,9 @@ def create_user(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Create a new user. Restricted to Admins.
+    Onboard a new user into the system.
+    Requires: Admin role.
+    Logic: Hashes the provided password using PBKDF2 before storage.
     """
     try:
         db_user = db.query(models.User).filter(models.User.username == user_in.username).first()
@@ -53,10 +65,6 @@ def create_user(
         db.rollback()
         logger.error(f"Database error during user creation: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not create user in database")
-    except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        logger.error(f"Unexpected error in create_user: {str(e)}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 @router.put("/{user_id}/", response_model=schemas.UserSchema)
 @router.put("/{user_id}", response_model=schemas.UserSchema, include_in_schema=False)
@@ -67,7 +75,8 @@ def update_user(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Update an existing user. Restricted to Admins.
+    Modify an existing user's profile or password.
+    Requires: Admin role.
     """
     try:
         db_user = db.query(models.User).filter(models.User.id == user_id).first()
@@ -100,7 +109,9 @@ def delete_user(
     current_user: models.User = Depends(admin_required)
 ):
     """
-    Delete a user. Users cannot delete themselves. Restricted to Admins.
+    Permanently delete a user from the system.
+    Requires: Admin role.
+    Security: Prevents an admin from deleting their own account.
     """
     try:
         if current_user.id == user_id:
@@ -121,3 +132,30 @@ def delete_user(
         db.rollback()
         logger.error(f"Database error during user deletion (ID: {user_id}): {str(e)}")
         raise HTTPException(status_code=500, detail="Could not delete user from database")
+
+@router.put("/me/password")
+def update_own_password(
+    password_in: schemas.UserPasswordUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Allow the currently authenticated user to change their own password.
+    Requires: Any valid authenticated session.
+    Security: Fixes [V07] by providing self-service password management.
+    """
+    try:
+        # Verify old password
+        if not auth.verify_password(password_in.old_password, current_user.hashed_password):
+            logger.warning(f"Failed password change attempt by user {current_user.username}: Incorrect old password.")
+            raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+        # Hash and save new password
+        current_user.hashed_password = auth.get_password_hash(password_in.new_password)
+        db.commit()
+        logger.info(f"User {current_user.username} successfully updated their password.")
+        return {"message": "Password updated successfully"}
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error during self-password update for {current_user.username}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not update password in database")

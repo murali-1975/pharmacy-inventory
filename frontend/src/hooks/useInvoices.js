@@ -36,6 +36,17 @@ export const useInvoices = (token, onUnauthorized) => {
     }
   }, [token, fetchInvoices, onUnauthorized]);
 
+  const saveInvoicePayment = useCallback(async (invoiceId, paymentData) => {
+    try {
+      await api.addInvoicePayment(invoiceId, paymentData, token);
+      await fetchInvoices();
+      return true;
+    } catch (err) {
+      if (err.message === 'Unauthorized') onUnauthorized();
+      throw err; // Let the form handle the specific error message
+    }
+  }, [token, fetchInvoices, onUnauthorized]);
+
   const deleteInvoice = useCallback(async (id) => {
     if (!window.confirm('Are you sure you want to delete this invoice?')) return;
     try {
@@ -60,6 +71,7 @@ export const useInvoices = (token, onUnauthorized) => {
     currentPage,
     totalInvoices,
     pageSize,
-    changePage
+    changePage,
+    saveInvoicePayment
   };
 };

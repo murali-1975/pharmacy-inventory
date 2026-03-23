@@ -38,4 +38,5 @@ Thumbs.db
 .gemini/
 .antigravity/
 backend/server_logs*.txt
+backend/logs/
 frontend/dist/

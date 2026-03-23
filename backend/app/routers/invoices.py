@@ -1,3 +1,8 @@
+"""
+Purchase Invoices Router.
+Handles life-cycle management of invoices received from suppliers, including line items and settlement payments.
+Access: All authenticated users (Read/Create), Admin/Manager (Update/Delete).
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,6 +22,7 @@ admin_manager_required = auth.RoleChecker(["Admin", "Manager"])
 def create_invoice(invoice_in: schemas.InvoiceCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     """
     Create a new invoice with associated line items.
+    Validation: Ensures Supplier and all referenced Medicines exist.
     """
     try:
         # Verify supplier exists
@@ -34,7 +40,7 @@ def create_invoice(invoice_in: schemas.InvoiceCreate, db: Session = Depends(data
             gst=invoice_in.gst
         )
         db.add(db_invoice)
-        db.flush() # Get ID
+        db.flush() # Get ID for line items
         
         # Create Line Items
         for item in invoice_in.line_items:
@@ -63,7 +69,9 @@ def create_invoice(invoice_in: schemas.InvoiceCreate, db: Session = Depends(data
 @router.get("/", response_model=schemas.PaginatedInvoices)
 def list_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
     """
-    List all invoices with optional pagination, sorted by date descending.
+    List all invoices with server-side pagination.
+    Returns: PaginatedInvoices (total count + items).
+    Sorting: By invoice date descending.
     """
     query = db.query(models.Invoice)
     total = query.count()
@@ -73,7 +81,7 @@ def list_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(databas
 @router.get("/{id}", response_model=schemas.InvoiceSchema)
 def get_invoice(id: int, db: Session = Depends(database.get_db)):
     """
-    Retrieve a specific invoice by ID.
+    Retrieve a specific invoice by its ID, including all line items and payments.
     """
     invoice = db.query(models.Invoice).filter(models.Invoice.id == id).first()
     if not invoice:
@@ -84,7 +92,7 @@ def get_invoice(id: int, db: Session = Depends(database.get_db)):
 @router.put("/{id}", response_model=schemas.InvoiceSchema)
 def update_invoice(id: int, invoice_in: schemas.InvoiceUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     """
-    Update an existing invoice's details.
+    Update an existing invoice's header details.
     """
     try:
         db_invoice = db.query(models.Invoice).filter(models.Invoice.id == id).first()
@@ -107,8 +115,8 @@ def update_invoice(id: int, invoice_in: schemas.InvoiceUpdate, db: Session = Dep
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_invoice(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(admin_manager_required)):
     """
-    Delete an invoice. Line items are normally cascade-deleted or manually cleaned.
-    Restricted to Admin/Manager.
+    Delete an invoice, along with its line items and payments.
+    Requires: Admin or Manager role.
     """
     try:
         db_invoice = db.query(models.Invoice).filter(models.Invoice.id == id).first()
@@ -117,8 +125,10 @@ def delete_invoice(id: int, db: Session = Depends(database.get_db), current_user
             raise HTTPException(status_code=404, detail="Invoice not found")
         
         ref = db_invoice.reference_number
-        # Delete line items first (manual cleanup if not cascade-configured in models)
+        # Explicitly delete related line items and payments
         db.query(models.InvoiceLineItem).filter(models.InvoiceLineItem.invoice_id == id).delete()
+        db.query(models.InvoicePayment).filter(models.InvoicePayment.invoice_id == id).delete()
+        
         db.delete(db_invoice)
         db.commit()
         logger.info(f"User {current_user.username} deleted invoice: {ref} (ID: {id})")
@@ -127,3 +137,62 @@ def delete_invoice(id: int, db: Session = Depends(database.get_db), current_user
         db.rollback()
         logger.error(f"Database error during invoice deletion (ID: {id}): {str(e)}")
         raise HTTPException(status_code=500, detail="Could not delete invoice from database")
+
+# --- Invoice Payments ---
+
+@router.post("/{invoice_id}/payments", response_model=schemas.InvoicePaymentSchema)
+def record_payment(
+    invoice_id: int, 
+    payment: schemas.InvoicePaymentCreate, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Record a payment against an invoice.
+    Logic: Automatically updates the invoice status to "Paid" if total payments settle the invoice value.
+    """
+    try:
+        db_invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_id).first()
+        if not db_invoice:
+            logger.warning(f"Payment record failed: Invoice ID {invoice_id} not found.")
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        db_payment = models.InvoicePayment(**payment.model_dump())
+        db_payment.invoice_id = invoice_id
+        db.add(db_payment)
+        
+        # Flush to allow calculation including the new payment
+        db.flush()
+        
+        # Calculate settlement progress
+        all_payments = db.query(models.InvoicePayment).filter(models.InvoicePayment.invoice_id == invoice_id).all()
+        total_paid = sum(p.paid_amount for p in all_payments)
+        
+        # Auto-settlement logic
+        if total_paid >= db_invoice.total_value:
+            db_invoice.status = models.InvoiceStatus.Paid
+            
+        db.commit()
+        db.refresh(db_payment)
+        logger.info(f"User {current_user.username} recorded payment of {db_payment.paid_amount} for invoice ID {invoice_id}")
+        return db_payment
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error during payment recording (Invoice: {invoice_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not record payment in database")
+
+@router.get("/{invoice_id}/payments", response_model=List[schemas.InvoicePaymentSchema])
+def get_invoice_payments(
+    invoice_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Retrieve all payments recorded for a specific invoice.
+    """
+    try:
+        payments = db.query(models.InvoicePayment).filter(models.InvoicePayment.invoice_id == invoice_id).all()
+        return payments
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during payments retrieval (Invoice: {invoice_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve payments from database")

@@ -1,17 +1,24 @@
+"""
+Main Application Entry Point.
+Initializes the FastAPI app, configures global middleware (CORS, Logging), 
+registers exception handlers, and mounts API routers.
+"""
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from . import models, database
 from .routers import auth, suppliers, lookups, users, invoices, medicines, manufacturers
 from .core.config import settings
 from .core.logging_config import LoggingMiddleware, logger
 
-# Initialize database
+# Initialize database tables on startup (Synchronous for simplicity in current setup)
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title=settings.APP_NAME)
 
-# Robust CORS Configuration
+# Robust CORS Configuration: Allow specific origins for local development and testing
 origins = [
     "http://localhost:5173", "http://127.0.0.1:5173",
     "http://localhost:5174", "http://127.0.0.1:5174",
@@ -29,7 +36,7 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Universal CORS Middleware for Redirects/Errors
+# Universal CORS Middleware: Ensures CORS headers are present even on redirects or server errors.
 @app.middleware("http")
 async def add_cors_headers(request: Request, call_next):
     origin = request.headers.get("origin")
@@ -43,18 +50,39 @@ async def add_cors_headers(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
+    """Log application startup details."""
     logger.info(f"Starting {settings.APP_NAME}...")
 
-# Global Exception Handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global error caught: {exc}", exc_info=True)
+# --- Global Exception Handlers ---
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors with a structured JSON response."""
+    logger.error(f"Validation error: {exc.errors()} on path {request.url.path}")
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "An unexpected error occurred. Please try again later."},
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": "Input validation failed", "errors": exc.errors()},
     )
 
-# Include Routers
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Handle database layer errors to prevent leaking raw connection/schema details."""
+    logger.error(f"Database error: {str(exc)} on path {request.url.path}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "A database error occurred. Please contact support."},
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions to ensure the API always returns JSON."""
+    logger.error(f"Unexpected error: {str(exc)} on path {request.url.path}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An unexpected server error occurred."},
+    )
+
+# --- Router Registration ---
 app.include_router(auth.router)
 app.include_router(suppliers.router)
 app.include_router(lookups.router)
@@ -65,4 +93,5 @@ app.include_router(manufacturers.router)
 
 @app.get("/")
 def read_root():
+    """API health check endpoint."""
     return {"message": "Welcome to Pharmacy Inventory API"}

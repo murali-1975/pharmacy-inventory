@@ -200,6 +200,30 @@ export const api = {
     return res.json();
   },
 
+  addInvoicePayment: async (id, paymentData, token) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/payments`, {
+      method: 'POST',
+      headers: getHeaders(token),
+      body: JSON.stringify(paymentData)
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (res.status === 422) {
+      const data = await res.json();
+      throw new Error(Array.isArray(data.detail) ? data.detail[0].msg : data.detail);
+    }
+    if (!res.ok) throw new Error('Failed to record payment');
+    return res.json();
+  },
+
+  getInvoicePayments: async (id, token) => {
+    const res = await fetch(`${API_BASE}/invoices/${id}/payments`, {
+      headers: getHeaders(token)
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error('Failed to fetch invoice payments');
+    return res.json();
+  },
+
   // Medicines
   getMedicines: async (token) => {
     const res = await fetch(`${API_BASE}/medicines/`, { headers: getHeaders(token) });

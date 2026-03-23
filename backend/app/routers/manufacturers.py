@@ -1,9 +1,14 @@
+"""
+Manufacturer Master Router.
+Handles CRUD operations for medicine manufacturers and pharmaceutical brands.
+Access: All authenticated users (Read), Admin/Manager (Write/Delete).
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, database, auth, schemas
-from ..core.logging_config import logger
+from app import models, database, auth, schemas
+from app.core.logging_config import logger
 
 router = APIRouter(
     prefix="/manufacturers",
@@ -18,7 +23,11 @@ def list_manufacturers(skip: int = 0, limit: int = 100, db: Session = Depends(da
     """
     List all manufacturers with optional pagination.
     """
-    return db.query(models.Manufacturer).offset(skip).limit(limit).all()
+    try:
+        return db.query(models.Manufacturer).offset(skip).limit(limit).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during manufacturers retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve manufacturers from database")
 
 @router.post("/", response_model=schemas.ManufacturerSchema)
 def create_manufacturer(
@@ -27,7 +36,8 @@ def create_manufacturer(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Create a new manufacturer. Restricted to Admin/Manager.
+    Add a new manufacturer to the master list.
+    Requires: Admin or Manager role.
     """
     try:
         db_manufacturer = models.Manufacturer(**manufacturer_in.model_dump())
@@ -39,7 +49,6 @@ def create_manufacturer(
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Database error during manufacturer creation: {str(e)}")
-        # Check for unique constraint (common for names)
         if "unique constraint" in str(e).lower() or "duplicate key" in str(e).lower():
             raise HTTPException(status_code=400, detail="Manufacturer name already exists")
         raise HTTPException(status_code=500, detail="Could not create manufacturer in database")
@@ -52,7 +61,8 @@ def update_manufacturer(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Update an existing manufacturer. Restricted to Admin/Manager.
+    Update details for an existing manufacturer.
+    Requires: Admin or Manager role.
     """
     try:
         db_manufacturer = db.query(models.Manufacturer).filter(models.Manufacturer.id == manufacturer_id).first()
@@ -79,8 +89,9 @@ def delete_manufacturer(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Delete a manufacturer. 
-    If medicines are associated, it is deactivated (soft delete).
+    Delete a manufacturer.
+    Requires: Admin or Manager role.
+    Security: If any medicines are linked to this manufacturer, it is soft-deleted (is_active=False) to maintain catalog history.
     """
     try:
         db_manufacturer = db.query(models.Manufacturer).filter(models.Manufacturer.id == manufacturer_id).first()
@@ -88,7 +99,7 @@ def delete_manufacturer(
             logger.warning(f"Manufacturer deletion failed: ID {manufacturer_id} not found.")
             raise HTTPException(status_code=404, detail="Manufacturer not found")
         
-        # Check if has medicines
+        # Check if manufacturer is linked to medicines
         medicine_count = db.query(models.Medicine).filter(models.Medicine.manufacturer_id == manufacturer_id).count()
         name = db_manufacturer.name
 

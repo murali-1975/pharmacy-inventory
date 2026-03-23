@@ -1,3 +1,7 @@
+"""
+Authentication and Authorization module.
+Handles JWT token generation, password hashing, and role-based access control (RBAC).
+"""
 from datetime import datetime, timedelta
 from typing import Optional, List
 from jose import JWTError, jwt
@@ -16,16 +20,21 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# Security: Using bcrypt for more secure password hashing.
+# pbkdf2_sha256 is kept for backward compatibility with existing accounts.
+pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def verify_password(plain_password, hashed_password):
+    """Verifies a plain text password against its hashed version."""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
+    """Generates a secure hash of a password using bcrypt."""
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Generates a JWT access token for a user."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -37,11 +46,20 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
+    """
+    FastAPI dependency that extracts the user from a JWT token.
+    Security: Verifies token integrity AND checks if the user account is active.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    inactive_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="User account is deactivated. Please contact an administrator.",
+    )
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -49,12 +67,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+        
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise credentials_exception
+    
+    # Fix [V08]: Prevent inactive users from accessing the system even with a valid token.
+    if not user.is_active:
+        logger.warning(f"Deactivated user {username} attempted access with a valid token.")
+        raise inactive_exception
+        
     return user
 
 class RoleChecker:
+    """
+    Dependency to check if the current user has at least one of the allowed roles.
+    Example: Depends(RoleChecker(["Admin", "Manager"]))
+    """
     def __init__(self, allowed_roles: List[str]):
         self.allowed_roles = allowed_roles
 

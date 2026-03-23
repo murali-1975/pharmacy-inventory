@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Plus, FileText, Calendar, Truck, CreditCard, ChevronRight, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, FileText, Calendar, Truck, CreditCard, ChevronRight, Edit, Trash2, IndianRupee } from 'lucide-react';
+import PaymentForm from '../components/invoices/PaymentForm';
 
 /**
  * Component for viewing and managing purchase invoices.
@@ -20,9 +21,12 @@ const InvoicesView = ({
   currentPage,
   totalInvoices,
   pageSize,
-  onChangePage
+  onChangePage,
+  onRefresh,
+  onSavePayment
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null);
 
   const filteredInvoices = invoices.filter(inv => 
     (inv.reference_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -64,7 +68,9 @@ const InvoicesView = ({
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Invoice #</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th> {/* Added Status Header */}
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total Value</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Paid</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
@@ -88,12 +94,46 @@ const InvoicesView = ({
                       {invoice.supplier?.supplier_name || 'General Supplier'}
                     </div>
                   </td>
+                  <td className="px-6 py-5">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      invoice.status === 'Paid' ? 'bg-green-100 text-green-600' :
+                      invoice.status === 'Hold' ? 'bg-orange-100 text-orange-600' :
+                      invoice.status === 'Cancelled' ? 'bg-red-100 text-red-600' :
+                      'bg-yellow-100 text-yellow-600'
+                    }`}>
+                      {invoice.status || 'Pending'}
+                    </span>
+                  </td>
                   <td className="px-6 py-5 text-right">
                     <div className="text-sm font-black text-gray-900">₹{invoice.total_value.toLocaleString()}</div>
                     <div className="text-[10px] text-gray-400 font-bold uppercase">Incl. GST: ₹{invoice.gst}</div>
                   </td>
                   <td className="px-6 py-5 text-right">
+                    {(() => {
+                      const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + p.paid_amount, 0);
+                      const balance = invoice.total_value - totalPaid;
+                      return (
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-black text-blue-600">₹{totalPaid.toLocaleString()}</span>
+                          {balance > 0 && (
+                            <span className="text-[10px] font-bold text-orange-500 uppercase">Due: ₹{balance.toLocaleString()}</span>
+                          )}
+                          {balance <= 0 && totalPaid > 0 && (
+                            <span className="text-[10px] font-bold text-green-500 uppercase">Settled</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end space-x-2">
+                      <button 
+                        onClick={() => setSelectedInvoiceForPayment(invoice)}
+                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                        title="Record Payment"
+                      >
+                        <IndianRupee size={18} />
+                      </button>
                       <button 
                         onClick={() => onEditClick(invoice)}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -116,7 +156,7 @@ const InvoicesView = ({
               ))}
               {filteredInvoices.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-gray-500 font-medium">
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500 font-medium">
                     No invoices found.
                   </td>
                 </tr>
@@ -151,6 +191,17 @@ const InvoicesView = ({
           </div>
         </div>
       </div>
+
+      {selectedInvoiceForPayment && (
+        <PaymentForm 
+          invoice={selectedInvoiceForPayment}
+          onClose={() => setSelectedInvoiceForPayment(null)}
+          onSave={async (id, data) => {
+            await onSavePayment(id, data);
+            setSelectedInvoiceForPayment(null);
+          }}
+        />
+      )}
     </div>
   );
 };

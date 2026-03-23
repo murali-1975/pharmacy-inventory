@@ -14,6 +14,7 @@ const InvoiceForm = ({
     reference_number: '',
     total_value: 0,
     gst: 0,
+    status: 'Pending',
     line_items: []
   });
 
@@ -153,6 +154,24 @@ const InvoiceForm = ({
               value={formData.total_value}
               onChange={(e) => setFormData({ ...formData, total_value: parseFloat(e.target.value) || 0 })}
             />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Invoice Status</label>
+          <div className="relative">
+            <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <select
+              required
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold appearance-none cursor-pointer"
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+            >
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Hold">Hold</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
           </div>
         </div>
       </div>

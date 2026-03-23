@@ -1,9 +1,14 @@
+"""
+Medicine Master Router.
+Handles CRUD operations for medicine master data, brand names, and drug details.
+Access: All authenticated users (Read), Admin/Manager (Write/Delete).
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, schemas, database, auth
-from ..core.logging_config import logger
+from app import models, database, auth, schemas
+from app.core.logging_config import logger
 
 router = APIRouter(
     prefix="/medicines",
@@ -17,8 +22,13 @@ admin_manager_required = auth.RoleChecker(["Admin", "Manager"])
 def list_medicines(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
     """
     List all medicines with optional pagination.
+    Returns: List[schemas.MedicineSchema]
     """
-    return db.query(models.Medicine).offset(skip).limit(limit).all()
+    try:
+        return db.query(models.Medicine).offset(skip).limit(limit).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during medicines retrieval: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not retrieve medicines from database")
 
 @router.post("/", response_model=schemas.MedicineSchema)
 def create_medicine(
@@ -27,7 +37,9 @@ def create_medicine(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Create a new medicine entry. Restricted to Admin/Manager.
+    Create a new medicine entry.
+    Requires: Admin or Manager role.
+    Validation: Ensures Manufacturer ID exists and product name/HSN is unique.
     """
     try:
         if medicine_in.manufacturer_id:
@@ -57,7 +69,8 @@ def update_medicine(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Update an existing medicine entry. Restricted to Admin/Manager.
+    Update an existing medicine entry.
+    Requires: Admin or Manager role.
     """
     try:
         db_medicine = db.query(models.Medicine).filter(models.Medicine.id == medicine_id).first()
@@ -90,8 +103,10 @@ def delete_medicine(
     current_user: models.User = Depends(admin_manager_required)
 ):
     """
-    Delete a medicine entry. 
-    If used in any invoices, it is deactivated (soft delete).
+    Delete a medicine entry.
+    Requires: Admin or Manager role.
+    Logic: If the medicine is referenced in any historic invoice, it is soft-deleted (is_active=False).
+    Otherwise, it is hard-deleted from the database.
     """
     try:
         db_medicine = db.query(models.Medicine).filter(models.Medicine.id == medicine_id).first()
@@ -99,7 +114,7 @@ def delete_medicine(
             logger.warning(f"Medicine deletion failed: ID {medicine_id} not found.")
             raise HTTPException(status_code=404, detail="Medicine not found")
         
-        # Check if used in invoices
+        # Check if used in invoices (Business rule: Prevent hard-deleting records with transaction history)
         usage_count = db.query(models.InvoiceLineItem).filter(models.InvoiceLineItem.medicine_id == medicine_id).count()
         name = db_medicine.product_name
 

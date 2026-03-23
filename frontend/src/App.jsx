@@ -69,7 +69,8 @@ const App = () => {
     currentPage,
     totalInvoices,
     pageSize,
-    changePage
+    changePage,
+    saveInvoicePayment
   } = useInvoices(token, logout);
 
   const {
@@ -250,6 +251,8 @@ const App = () => {
               totalInvoices={totalInvoices}
               pageSize={pageSize}
               onChangePage={changePage}
+              onRefresh={fetchInvoices}
+              onSavePayment={saveInvoicePayment}
             />
           )}
           {activeTab === 'admin' && currentUser?.role === 'Admin' && (
