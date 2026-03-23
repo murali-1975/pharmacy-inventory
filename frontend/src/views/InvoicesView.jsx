@@ -16,7 +16,11 @@ const InvoicesView = ({
   onAddClick, 
   onEditClick, 
   onDeleteClick,
-  currentUser 
+  currentUser,
+  currentPage,
+  totalInvoices,
+  pageSize,
+  onChangePage
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -119,6 +123,32 @@ const InvoicesView = ({
               )}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Footer */}
+        <div className="bg-white border-t border-gray-100 flex items-center justify-between px-6 py-4">
+          <div className="text-sm text-gray-500 font-medium whitespace-nowrap">
+            Showing <span className="font-bold text-gray-900">{invoices.length ? (currentPage - 1) * pageSize + 1 : 0}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * pageSize, totalInvoices)}</span> of <span className="font-bold text-gray-900">{totalInvoices}</span> invoices
+          </div>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => onChangePage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Previous
+            </button>
+            <div className="text-sm font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl">
+              Page {currentPage} of {Math.max(1, Math.ceil(totalInvoices / pageSize))}
+            </div>
+            <button 
+              onClick={() => onChangePage(currentPage + 1)}
+              disabled={currentPage >= Math.ceil(totalInvoices / pageSize)}
+              className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>

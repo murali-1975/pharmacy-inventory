@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from .. import models, schemas, database, auth
-from ..core.logging_config import logger
+from app import models, schemas, database, auth
+from app.core.logging_config import logger
 
 router = APIRouter(
     prefix="/invoices",
@@ -60,12 +60,15 @@ def create_invoice(invoice_in: schemas.InvoiceCreate, db: Session = Depends(data
         logger.error(f"Database error during invoice creation: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not create invoice in database")
 
-@router.get("/", response_model=List[schemas.InvoiceSchema])
+@router.get("/", response_model=schemas.PaginatedInvoices)
 def list_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
     """
-    List all invoices with optional pagination.
+    List all invoices with optional pagination, sorted by date descending.
     """
-    return db.query(models.Invoice).offset(skip).limit(limit).all()
+    query = db.query(models.Invoice)
+    total = query.count()
+    items = query.order_by(models.Invoice.invoice_date.desc()).offset(skip).limit(limit).all()
+    return {"total": total, "items": items}
 
 @router.get("/{id}", response_model=schemas.InvoiceSchema)
 def get_invoice(id: int, db: Session = Depends(database.get_db)):

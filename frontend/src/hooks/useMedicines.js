@@ -48,10 +48,27 @@ export const useMedicines = (token, onUnauthorized) => {
     }
   }, [token, fetchMedicines, onUnauthorized]);
 
+  /**
+   * Deletes a medicine by ID.
+   * 
+   * @param {number} id - The ID of the medicine to delete.
+   */
+  const deleteMedicine = useCallback(async (id) => {
+    if (!window.confirm('Are you sure you want to delete this medicine?')) return;
+    try {
+      await api.deleteMedicine(token, id);
+      await fetchMedicines();
+    } catch (err) {
+      if (err.message === 'Unauthorized') onUnauthorized();
+      else alert(err.message || 'Failed to delete medicine');
+    }
+  }, [token, fetchMedicines, onUnauthorized]);
+
   return {
     medicines,
     loading,
     fetchMedicines,
-    saveMedicine
+    saveMedicine,
+    deleteMedicine
   };
 };

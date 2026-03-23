@@ -6,7 +6,8 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
     name: '',
     address: '',
     contact_person: '',
-    phone_number: ''
+    phone_number: '',
+    contact_email: ''
   });
 
   const handleSubmit = (e) => {
@@ -67,6 +68,19 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
               placeholder="+91 XXXXX XXXXX"
             />
           </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-bold text-gray-700">Contact Email</label>
+        <div className="relative group">
+          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+          <input 
+            type="email"
+            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+            value={formData.contact_email || ''}
+            onChange={(e) => setFormData({...formData, contact_email: e.target.value})}
+            placeholder="email@example.com"
+          />
         </div>
       </div>
 

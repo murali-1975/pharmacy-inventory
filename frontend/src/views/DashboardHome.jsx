@@ -2,8 +2,11 @@ import React from 'react';
 import { Package, Building2, TrendingUp, AlertCircle } from 'lucide-react';
 import { StatCard } from '../components/common/Common';
 
-const DashboardHome = ({ setView }) => (
-  <>
+const DashboardHome = ({ setView, invoices = [] }) => {
+  const recentInvoices = invoices.slice(0, 5);
+  
+  return (
+    <>
     {/* Stats Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <StatCard icon={Package} label="Total Medicines" value="248" trend={12} color="bg-blue-500" subValue="items" />
@@ -18,27 +21,30 @@ const DashboardHome = ({ setView }) => (
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold">Recent Invoices</h2>
           <button 
-            onClick={() => setView('Invoices')}
+            onClick={() => setView('invoices')}
             className="text-sm text-blue-600 font-semibold hover:text-blue-700 transition-colors"
           >
             View All
           </button>
         </div>
         <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:bg-gray-50 transition-colors">
+          {recentInvoices.map((inv) => (
+            <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:bg-gray-50 transition-colors">
               <div className="flex items-center space-x-4">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
                   <TrendingUp size={18} />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">INV-2024-00{i}</p>
-                  <p className="text-xs text-gray-500">2 hours ago</p>
+                  <p className="font-semibold text-gray-900">{inv.reference_number}</p>
+                  <p className="text-xs text-gray-500">{new Date(inv.invoice_date).toLocaleDateString()}</p>
                 </div>
               </div>
-              <p className="font-bold text-gray-900">₹4,250.00</p>
+              <p className="font-bold text-gray-900">₹{inv.total_value.toLocaleString()}</p>
             </div>
           ))}
+          {recentInvoices.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">No recent invoices.</p>
+          )}
         </div>
       </div>
 
@@ -51,7 +57,7 @@ const DashboardHome = ({ setView }) => (
               <span>Add New Product</span>
             </button>
             <button 
-              onClick={() => setView('Suppliers')}
+              onClick={() => setView('suppliers')}
               className="w-full bg-white text-blue-600 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-blue-700/20"
             >
               Manage Suppliers
@@ -62,6 +68,7 @@ const DashboardHome = ({ setView }) => (
       </div>
     </div>
   </>
-);
+  );
+};
 
 export default DashboardHome;

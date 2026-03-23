@@ -171,8 +171,8 @@ export const api = {
   },
 
   // Invoices
-  getInvoices: async (token) => {
-    const res = await fetch(`${API_BASE}/invoices/`, { headers: getHeaders(token) });
+  getInvoices: async (token, skip = 0, limit = 10) => {
+    const res = await fetch(`${API_BASE}/invoices/?skip=${skip}&limit=${limit}`, { headers: getHeaders(token) });
     if (res.status === 401) throw new Error('Unauthorized');
     if (!res.ok) throw new Error('Failed to fetch invoices');
     return res.json();
@@ -191,11 +191,12 @@ export const api = {
   },
 
   deleteInvoice: async (token, id) => {
-    const res = await fetch(`${API_BASE}/invoices/${id}/`, {
+    const res = await fetch(`${API_BASE}/invoices/${id}`, {
       method: 'DELETE',
       headers: getHeaders(token)
     });
     if (!res.ok) throw new Error('Failed to delete invoice');
+    if (res.status === 204) return null;
     return res.json();
   },
 

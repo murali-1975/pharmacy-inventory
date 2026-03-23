@@ -4,21 +4,26 @@ import api from '../api';
 export const useInvoices = (token, onUnauthorized) => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalInvoices, setTotalInvoices] = useState(0);
+  const pageSize = 10;
 
-  const fetchInvoices = useCallback(async () => {
+  const fetchInvoices = useCallback(async (page = currentPage) => {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await api.getInvoices(token);
-      setInvoices(data);
+      const skip = (page - 1) * pageSize;
+      const data = await api.getInvoices(token, skip, pageSize);
+      setInvoices(data.items || []);
+      setTotalInvoices(data.total || 0);
+      setCurrentPage(page);
     } catch (err) {
       if (err.message === 'Unauthorized') onUnauthorized();
       else console.error('Failed to fetch invoices', err);
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
-
+  }, [token, onUnauthorized, currentPage, pageSize]);
   const saveInvoice = useCallback(async (invoiceData, id) => {
     try {
       await api.saveInvoice(token, invoiceData, id);
@@ -42,11 +47,19 @@ export const useInvoices = (token, onUnauthorized) => {
     }
   }, [token, fetchInvoices, onUnauthorized]);
 
+  const changePage = (newPage) => {
+    fetchInvoices(newPage);
+  };
+
   return {
     invoices,
     loading,
     fetchInvoices,
     saveInvoice,
-    deleteInvoice
+    deleteInvoice,
+    currentPage,
+    totalInvoices,
+    pageSize,
+    changePage
   };
 };

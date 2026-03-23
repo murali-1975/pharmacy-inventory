@@ -97,8 +97,8 @@ class ContactDetailSchema(ContactDetailBase):
 
 class SupplierBase(BaseModel):
     supplier_name: str
-    type_id: int
-    status_id: int
+    type_id: Optional[int] = None
+    status_id: Optional[int] = None
 
 class SupplierCreate(SupplierBase):
     bank_details: List[BankAccountCreate] = []
@@ -119,6 +119,7 @@ class ManufacturerBase(BaseModel):
     address: Optional[str] = None
     contact_person: Optional[str] = None
     phone_number: Optional[str] = None
+    contact_email: Optional[str] = None
 
 class ManufacturerCreate(ManufacturerBase):
     pass
@@ -137,7 +138,9 @@ class MedicineBase(BaseModel):
     hsn_code: Optional[str] = None
     category: str = "General"
     uom: Optional[str] = None
-    storage_type: Optional[str] = None
+    storage_type: Optional[str] = "Ambient"
+    description: Optional[str] = None
+    unit_price: float = 0.0
 
 class MedicineCreate(MedicineBase):
     pass
@@ -155,7 +158,7 @@ class InvoiceLineItemBase(BaseModel):
     description: Optional[str] = None
     quantity: int
     price: float
-    discount: float = 0.0
+    discount: Optional[float] = 0.0
     expiry_date: Optional[datetime.date] = None
     remarks: Optional[str] = None
 
@@ -173,7 +176,7 @@ class InvoiceBase(BaseModel):
     invoice_date: datetime.date
     reference_number: str
     total_value: float
-    gst: float = 0.0
+    gst: Optional[float] = 0.0
 
 class InvoiceCreate(InvoiceBase):
     line_items: List[InvoiceLineItemCreate] = []
@@ -191,3 +194,7 @@ class InvoiceSchema(InvoiceBase):
     line_items: List[InvoiceLineItemSchema] = []
     class Config:
         from_attributes = True
+
+class PaginatedInvoices(BaseModel):
+    total: int
+    items: List[InvoiceSchema]

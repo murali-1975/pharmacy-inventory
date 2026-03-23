@@ -55,6 +55,7 @@ const MedicinesView = ({
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Manufacturer</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Category & GST</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Storage & UOM</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Unit Price</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
@@ -103,6 +104,9 @@ const MedicinesView = ({
                       Per {m.uom}
                     </div>
                   </div>
+                </td>
+                <td className="px-6 py-6 text-right font-black text-blue-600">
+                  ₹{m.unit_price?.toFixed(2) || '0.00'}
                 </td>
                 <td className="px-6 py-6 text-right">
                   <div className="flex items-center justify-end space-x-2">

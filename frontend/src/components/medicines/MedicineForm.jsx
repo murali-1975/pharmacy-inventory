@@ -9,7 +9,9 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
     hsn_code: '',
     category: 'General',
     uom: 'Strip',
-    storage_type: 'Ambient'
+    storage_type: 'Ambient',
+    description: '',
+    unit_price: 0
   });
 
   const categories = ["Scheduled H", "Scheduled H1", "Scheduled X", "OTC", "General"];
@@ -31,7 +33,7 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
             <input 
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
-              value={formData.product_name}
+              value={formData.product_name || ''}
               onChange={(e) => setFormData({...formData, product_name: e.target.value})}
               placeholder="e.g. Crocin 650"
             />
@@ -44,7 +46,7 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
             <input 
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
-              value={formData.generic_name}
+              value={formData.generic_name || ''}
               onChange={(e) => setFormData({...formData, generic_name: e.target.value})}
               placeholder="e.g. Paracetamol"
             />
@@ -78,7 +80,7 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
               required
               maxLength={8}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
-              value={formData.hsn_code}
+              value={formData.hsn_code || ''}
               onChange={(e) => setFormData({...formData, hsn_code: e.target.value})}
               placeholder="8-digit code"
             />
@@ -124,6 +126,36 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
             >
               {storageTypes.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-gray-700">Unit Price (₹)</label>
+          <div className="relative group">
+            <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <input 
+              type="number"
+              step="0.01"
+              required
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+              value={formData.unit_price || 0}
+              onChange={(e) => setFormData({...formData, unit_price: parseFloat(e.target.value) || 0})}
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-gray-700">Description / Notes</label>
+          <div className="relative group">
+            <Box className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <input 
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+              value={formData.description || ''}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              placeholder="Brief description or usage notes"
+            />
           </div>
         </div>
       </div>

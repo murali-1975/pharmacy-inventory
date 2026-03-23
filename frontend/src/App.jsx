@@ -65,7 +65,11 @@ const App = () => {
     loading: invLoading,
     fetchInvoices,
     saveInvoice: onSaveInvoice,
-    deleteInvoice: onDeleteInvoice
+    deleteInvoice: onDeleteInvoice,
+    currentPage,
+    totalInvoices,
+    pageSize,
+    changePage
   } = useInvoices(token, logout);
 
   const {
@@ -221,7 +225,7 @@ const App = () => {
         </header>
 
         <section className="flex-1 overflow-y-auto p-10 bg-[#f9fafc]">
-          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} />}
+          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} invoices={invoices} />}
           {activeTab === 'suppliers' && (
             <SuppliersView 
               suppliers={suppliers} 
@@ -242,6 +246,10 @@ const App = () => {
               onDeleteClick={onDeleteInvoice}
               loading={invLoading}
               currentUser={currentUser}
+              currentPage={currentPage}
+              totalInvoices={totalInvoices}
+              pageSize={pageSize}
+              onChangePage={changePage}
             />
           )}
           {activeTab === 'admin' && currentUser?.role === 'Admin' && (
@@ -269,15 +277,7 @@ const App = () => {
           )}
         </section>
 
-        {/* Floating Add Button for Suppliers */}
-        {(activeTab === 'suppliers' && (currentUser?.role === 'Admin' || currentUser?.role === 'Manager')) && (
-          <button 
-            onClick={() => { setEditingItem(null); setModalType('supplier'); setIsModalOpen(true); }}
-            className="absolute bottom-10 right-10 w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-2xl shadow-blue-300 hover:bg-blue-700 hover:scale-110 active:scale-95 transition-all flex items-center justify-center z-40 group"
-          >
-            <Settings className="group-hover:rotate-90 transition-transform" />
-          </button>
-        )}
+
       </main>
 
       {/* Modal Overlay */}
