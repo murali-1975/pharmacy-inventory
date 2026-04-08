@@ -11,8 +11,16 @@ import SuppliersView from './views/SuppliersView';
 import InvoicesView from './views/InvoicesView';
 import Login from './components/Login';
 import AdminView from './views/AdminView';
+import DispensingView from './views/DispensingView';
 import ManufacturerForm from './components/manufacturers/ManufacturerForm';
 import MedicineForm from './components/medicines/MedicineForm';
+import StockView from './views/StockView';
+import FinancialsView from './views/FinancialsView';
+
+
+// Layout Components
+import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
 
 // API & Hooks
 import { useAuth } from './hooks/useAuth';
@@ -34,7 +42,7 @@ const App = () => {
   const [editingItem, setEditingItem] = useState(null);
 
   // Hooks
-  const { token, currentUser, authError, login, logout, fetchMe } = useAuth();
+  const { token, currentUser, authError, logoutReason, login, logout, fetchMe } = useAuth();
   const { 
     suppliers, 
     loading: supLoading, 
@@ -70,7 +78,12 @@ const App = () => {
     totalInvoices,
     pageSize,
     changePage,
-    saveInvoicePayment
+    saveInvoicePayment,
+    handleSearch,
+    searchTerm,
+    sortBy,
+    sortOrder,
+    handleSort
   } = useInvoices(token, logout);
 
   const {
@@ -87,24 +100,46 @@ const App = () => {
     deleteManufacturer: onDeleteManufacturer
   } = useManufacturers(token, logout);
 
-  // Initial Data Fetch
+  // Auth and Lookups Fetch
   useEffect(() => {
     if (token) {
       fetchMe();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchLookups(currentUser?.role === 'Admin');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, currentUser?.role]);
+
+  // General Master Data Fetch
+  useEffect(() => {
+    if (token) {
       fetchSuppliers();
-      fetchLookups();
-      fetchInvoices();
       fetchMedicines();
       fetchManufacturers();
     }
-  }, [token, fetchMe, fetchSuppliers, fetchLookups, fetchInvoices, fetchMedicines, fetchManufacturers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Invoices Fetch
+  useEffect(() => {
+    if (token) {
+      fetchInvoices();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   // Admin Data Fetch
   useEffect(() => {
     if (token && currentUser?.role === 'Admin') {
       fetchUsers();
     }
-  }, [token, currentUser, fetchUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, currentUser?.role]);
 
   const handleEditSupplier = (supplier) => {
     setEditingItem(supplier);
@@ -134,107 +169,45 @@ const App = () => {
     }
   };
 
+  // Filtered lookups for regular use (dropdowns, selectors)
+  const activeTypes = types.filter(t => t.is_active || t.id === editingItem?.type_id);
+  const activeStatuses = statuses.filter(s => s.is_active || s.id === editingItem?.status_id);
+
   if (!token) {
-    return <Login onLogin={login} error={authError} />;
+    return <Login onLogin={login} error={authError} logoutReason={logoutReason} />;
   }
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden text-sm">
-      {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white border-r border-gray-100 flex flex-col transition-all duration-500 ease-in-out z-30 shadow-2xl shadow-gray-200/50`}>
-        <div className="p-8 flex items-center space-x-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-200 shrink-0 transform hover:rotate-12 transition-transform cursor-pointer">
-            <img src={omniflowLogo} alt="Omniflow Logo" className="w-8 h-8 object-contain brightness-0 invert" />
-          </div>
-          {sidebarOpen && (
-            <div className="overflow-hidden whitespace-nowrap">
-              <h1 className="text-2xl font-black tracking-tight text-gray-900 leading-none">Omniflow</h1>
-              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1 opacity-60">Inventory Systems</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-hide">
-          <SidebarItem 
-            icon={LayoutDashboard} 
-            label="Dashboard" 
-            active={activeTab === 'dashboard'} 
-            onClick={() => setActiveTab('dashboard')} 
-            isOpen={sidebarOpen}
-          />
-          <SidebarItem 
-            icon={Package} 
-            label="Suppliers" 
-            active={activeTab === 'suppliers'} 
-            onClick={() => setActiveTab('suppliers')} 
-            isOpen={sidebarOpen}
-          />
-          <SidebarItem 
-            icon={LayoutDashboard} // Replace with FileText if available, using LayoutDashboard as placeholder
-            label="Invoices" 
-            active={activeTab === 'invoices'} 
-            onClick={() => setActiveTab('invoices')} 
-            isOpen={sidebarOpen}
-          />
-          
-          {currentUser?.role === 'Admin' && (
-            <div className="pt-8 pb-2">
-              {sidebarOpen && <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Administration</p>}
-              <SidebarItem 
-                icon={Settings} 
-                label="Admin Hub" 
-                active={activeTab === 'admin'} 
-                onClick={() => setActiveTab('admin')} 
-                isOpen={sidebarOpen}
-              />
-            </div>
-          )}
-        </nav>
-
-        <div className="p-6 border-t border-gray-50">
-          <button onClick={logout} className="w-full flex items-center space-x-3 p-4 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all duration-300 group font-bold">
-            <LogOut size={22} className="group-hover:-translate-x-1 transition-transform" />
-            {sidebarOpen && <span>Sign Out</span>}
-          </button>
-        </div>
-      </aside>
+      <Sidebar 
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        currentUser={currentUser}
+        logout={logout}
+        logo={omniflowLogo}
+      />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-24 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-10 z-20 sticky top-0">
-          <div className="flex items-center space-x-6">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors shadow-sm bg-white border border-gray-100">
-              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            <div className="h-8 w-px bg-gray-100"></div>
-            <div className="flex items-center space-x-2 text-sm font-bold text-gray-400">
-              <span>Omniflow</span>
-              <ChevronRight size={14} />
-              <span className="text-gray-900 capitalize">{activeTab}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-6">
-            <div className="hidden md:flex flex-col text-right">
-              <span className="text-sm font-black text-gray-900">{currentUser?.username || 'Loading...'}</span>
-              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tighter">{currentUser?.role || 'Staff'} Access</span>
-            </div>
-            <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-blue-400 rounded-2xl shadow-lg shadow-blue-200 border-2 border-white flex items-center justify-center text-white font-black text-lg">
-              {(currentUser?.username || 'U')[0].toUpperCase()}
-            </div>
-          </div>
-        </header>
+        <Header 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          activeTab={activeTab}
+          currentUser={currentUser}
+        />
 
         <section className="flex-1 overflow-y-auto p-10 bg-[#f9fafc]">
-          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} invoices={invoices} />}
+          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} invoices={invoices} token={token} />}
           {activeTab === 'suppliers' && (
             <SuppliersView 
               suppliers={suppliers} 
               onAddClick={() => { setEditingItem(null); setModalType('supplier'); setIsModalOpen(true); }}
               onEditClick={handleEditSupplier}
               onDeleteClick={onDeleteSupplier}
-              types={types}
-              statuses={statuses}
+              types={activeTypes}
+              statuses={activeStatuses}
               loading={supLoading}
               currentUser={currentUser}
             />
@@ -253,7 +226,22 @@ const App = () => {
               onChangePage={changePage}
               onRefresh={fetchInvoices}
               onSavePayment={saveInvoicePayment}
+              onSearch={handleSearch}
+              searchTerm={searchTerm}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={handleSort}
+              token={token}
             />
+          )}
+          {activeTab === 'dispensing' && (
+            <DispensingView medicines={medicines} token={token} userRole={currentUser?.role} />
+          )}
+          {activeTab === 'stock' && (
+            <StockView medicinesList={medicines} token={token} userRole={currentUser?.role} />
+          )}
+          {activeTab === 'financials' && currentUser?.role === 'Admin' && (
+            <FinancialsView token={token} />
           )}
           {activeTab === 'admin' && currentUser?.role === 'Admin' && (
             <AdminView 
@@ -276,17 +264,17 @@ const App = () => {
               onEditMedicineMaster={(m) => { setEditingItem(m); setModalType('medicine'); setIsModalOpen(true); }}
               onDeleteMedicineMaster={onDeleteMedicine}
               currentUser={currentUser}
+              token={token}
             />
           )}
         </section>
-
-
       </main>
 
       {/* Modal Overlay */}
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingItem(null); }}
+        maxWidth={modalType === 'invoice' ? 'max-w-6xl' : 'max-w-2xl'}
         title={
           modalType === 'supplier' ? (editingItem ? 'Edit Supplier' : 'New Supplier') :
           modalType === 'invoice' ? (editingItem ? 'Edit Invoice' : 'New Purchase Invoice') :
@@ -299,8 +287,8 @@ const App = () => {
           <SupplierForm 
             onSave={handleSaveSupplier}
             initialData={editingItem}
-            types={types}
-            statuses={statuses}
+            types={activeTypes}
+            statuses={activeStatuses}
             onCancel={() => { setIsModalOpen(false); setEditingItem(null); }}
           />
         ) : modalType === 'invoice' ? (

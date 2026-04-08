@@ -1,8 +1,13 @@
 """
 Authentication and Authorization module.
-Handles JWT token generation, password hashing, and role-based access control (RBAC).
+
+Responsibilities:
+  - Password hashing and verification using PBKDF2-SHA256 (via passlib).
+  - JWT access token creation and validation using python-jose.
+  - FastAPI dependency ``get_current_user`` for all authenticated routes.
+  - ``RoleChecker`` dependency class for RBAC (Admin, Manager, Staff).
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -20,26 +25,34 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# Security: Using bcrypt for more secure password hashing.
-# pbkdf2_sha256 is kept for backward compatibility with existing accounts.
-pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
+# Security: Using pbkdf2_sha256 as primary to avoid bcrypt 72-byte strictness in some environments.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-def verify_password(plain_password, hashed_password):
-    """Verifies a plain text password against its hashed version."""
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plain text password against its stored PBKDF2-SHA256 hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
-def get_password_hash(password):
-    """Generates a secure hash of a password using bcrypt."""
+def get_password_hash(password: str) -> str:
+    """Generates a secure PBKDF2-SHA256 hash of a plain text password."""
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Generates a JWT access token for a user."""
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Generates a signed JWT access token.
+
+    Args:
+        data:          Payload dict (must include ``sub`` key with the username).
+        expires_delta: Optional custom lifetime; defaults to ACCESS_TOKEN_EXPIRE_MINUTES.
+
+    Returns:
+        A signed JWT string.
+    """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     logger.info(f"Token created for user: {data.get('sub')}")

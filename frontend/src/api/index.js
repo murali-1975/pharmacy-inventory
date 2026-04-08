@@ -1,9 +1,35 @@
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '/api';
 
 const getHeaders = (token) => ({
   'Content-Type': 'application/json',
   ...(token ? { 'Authorization': `Bearer ${token}` } : {})
 });
+
+/**
+ * Centered response handler for standardizing error reporting and 401 detection.
+ */
+const handleResponse = async (res) => {
+  if (res.status === 401) {
+    throw new Error('Unauthorized');
+  }
+  
+  if (res.status === 409) {
+    const data = await res.json().catch(() => ({}));
+    throw { status: 409, message: data.detail || 'Conflict error', detail: data.detail };
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    // Specific business error details
+    if (data.detail && typeof data.detail === 'object') {
+       throw new Error(data.detail.msg || JSON.stringify(data.detail));
+    }
+    throw new Error(data.detail || `Request failed with status ${res.status}`);
+  }
+  
+  if (res.status === 204) return null;
+  return res.json();
+};
 
 export const api = {
   // Auth
@@ -11,110 +37,84 @@ export const api = {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
-    const res = await fetch(`${API_BASE}/token`, {
+    const res = await fetch(`${API_BASE}/token/`, {
       method: 'POST',
       body: formData
     });
-    if (!res.ok) throw new Error('Invalid username or password');
-    return res.json();
+    return handleResponse(res);
   },
 
   register: async (username, email, password) => {
-    const res = await fetch(`${API_BASE}/register`, {
+    const res = await fetch(`${API_BASE}/register/`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ username, email, password })
     });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.detail || 'Registration failed');
-    }
-    return res.json();
+    return handleResponse(res);
   },
 
   getMe: async (token) => {
-    const res = await fetch(`${API_BASE}/users/me`, {
+    const res = await fetch(`${API_BASE}/users/me/`, {
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Unauthorized');
-    return res.json();
+    return handleResponse(res);
   },
 
   // Lookups
-  getStatuses: async (token) => {
-    const res = await fetch(`${API_BASE}/status/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch statuses');
-    return res.json();
+  getStatuses: async (token, includeInactive = false) => {
+    const url = includeInactive ? `${API_BASE}/lookups/status/?include_inactive=true` : `${API_BASE}/lookups/status/`;
+    const res = await fetch(url, { headers: getHeaders(token) });
+    return handleResponse(res);
   },
 
   saveStatus: async (token, statusData, id = null) => {
-    const url = id ? `${API_BASE}/status/${id}/` : `${API_BASE}/status/`;
+    const url = id ? `${API_BASE}/lookups/status/${id}/` : `${API_BASE}/lookups/status/`;
     const res = await fetch(url, {
       method: id ? 'PUT' : 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(statusData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save status');
-    return res.json();
+    return handleResponse(res);
   },
 
-  deleteStatus: async (token, id, soft = false) => {
-    const url = soft ? `${API_BASE}/status/${id}?soft=true` : `${API_BASE}/status/${id}`;
+  deleteStatus: async (token, id, hard = false) => {
+    const url = hard ? `${API_BASE}/lookups/status/${id}/?hard=true` : `${API_BASE}/lookups/status/${id}/`;
     const res = await fetch(url, {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (res.status === 409) {
-      const data = await res.json();
-      throw { status: 409, ...data.detail };
-    }
-    if (!res.ok) throw new Error('Failed to delete status');
-    return res.json();
+    return handleResponse(res);
   },
 
-  getSupplierTypes: async (token) => {
-    const res = await fetch(`${API_BASE}/supplier-types/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch supplier types');
-    return res.json();
+  getSupplierTypes: async (token, includeInactive = false) => {
+    const url = includeInactive ? `${API_BASE}/lookups/supplier-types/?include_inactive=true` : `${API_BASE}/lookups/supplier-types/`;
+    const res = await fetch(url, { headers: getHeaders(token) });
+    return handleResponse(res);
   },
 
   saveSupplierType: async (token, typeData, id = null) => {
-    const url = id ? `${API_BASE}/supplier-types/${id}/` : `${API_BASE}/supplier-types/`;
+    const url = id ? `${API_BASE}/lookups/supplier-types/${id}/` : `${API_BASE}/lookups/supplier-types/`;
     const res = await fetch(url, {
       method: id ? 'PUT' : 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(typeData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save supplier type');
-    return res.json();
+    return handleResponse(res);
   },
 
-  deleteSupplierType: async (token, id, soft = false) => {
-    const url = soft ? `${API_BASE}/supplier-types/${id}?soft=true` : `${API_BASE}/supplier-types/${id}`;
+  deleteSupplierType: async (token, id, hard = false) => {
+    const url = hard ? `${API_BASE}/lookups/supplier-types/${id}/?hard=true` : `${API_BASE}/lookups/supplier-types/${id}/`;
     const res = await fetch(url, {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (res.status === 409) {
-      const data = await res.json();
-      throw { status: 409, ...data.detail };
-    }
-    if (!res.ok) throw new Error('Failed to delete supplier type');
-    return res.json();
+    return handleResponse(res);
   },
 
   // Suppliers
   getSuppliers: async (token) => {
     const res = await fetch(`${API_BASE}/suppliers/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch suppliers');
-    return res.json();
+    return handleResponse(res);
   },
 
   saveSupplier: async (token, supplierData, id = null) => {
@@ -124,9 +124,7 @@ export const api = {
       headers: getHeaders(token),
       body: JSON.stringify(supplierData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save supplier');
-    return res.json();
+    return handleResponse(res);
   },
 
   deleteSupplier: async (token, id) => {
@@ -134,16 +132,13 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Failed to delete supplier');
-    return res.json();
+    return handleResponse(res);
   },
 
   // Users
   getUsers: async (token) => {
     const res = await fetch(`${API_BASE}/users/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch users');
-    return res.json();
+    return handleResponse(res);
   },
 
   saveUser: async (token, userData, id = null) => {
@@ -153,29 +148,23 @@ export const api = {
       headers: getHeaders(token),
       body: JSON.stringify(userData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.detail || 'Failed to save user');
-    }
-    return res.json();
+    return handleResponse(res);
   },
 
   deleteUser: async (token, id) => {
-    const res = await fetch(`${API_BASE}/users/${id}`, {
+    const res = await fetch(`${API_BASE}/users/${id}/`, {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Failed to delete user');
-    return res.json();
+    return handleResponse(res);
   },
 
   // Invoices
-  getInvoices: async (token, skip = 0, limit = 10) => {
-    const res = await fetch(`${API_BASE}/invoices/?skip=${skip}&limit=${limit}`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch invoices');
-    return res.json();
+  getInvoices: async (token, skip = 0, limit = 10, search = '', sortBy = 'invoice_date', sortOrder = 'desc') => {
+    let url = `${API_BASE}/invoices/?skip=${skip}&limit=${limit}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+    if (search) url += `&q=${encodeURIComponent(search)}`;
+    const res = await fetch(url, { headers: getHeaders(token) });
+    return handleResponse(res);
   },
 
   saveInvoice: async (token, invoiceData, id = null) => {
@@ -185,51 +174,60 @@ export const api = {
       headers: getHeaders(token),
       body: JSON.stringify(invoiceData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save invoice');
-    return res.json();
+    return handleResponse(res);
   },
 
   deleteInvoice: async (token, id) => {
-    const res = await fetch(`${API_BASE}/invoices/${id}`, {
+    const res = await fetch(`${API_BASE}/invoices/${id}/`, {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Failed to delete invoice');
-    if (res.status === 204) return null;
-    return res.json();
+    return handleResponse(res);
   },
 
   addInvoicePayment: async (id, paymentData, token) => {
-    const res = await fetch(`${API_BASE}/invoices/${id}/payments`, {
+    const res = await fetch(`${API_BASE}/invoices/${id}/payments/`, {
       method: 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(paymentData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (res.status === 422) {
-      const data = await res.json();
-      throw new Error(Array.isArray(data.detail) ? data.detail[0].msg : data.detail);
-    }
-    if (!res.ok) throw new Error('Failed to record payment');
-    return res.json();
+    return handleResponse(res);
   },
 
   getInvoicePayments: async (id, token) => {
-    const res = await fetch(`${API_BASE}/invoices/${id}/payments`, {
+    const res = await fetch(`${API_BASE}/invoices/${id}/payments/`, {
+      headers: getHeaders(token)
+    });
+    return handleResponse(res);
+  },
+
+  uploadInvoices: async (token, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/invoices/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+        // Don't set Content-Type, browser will set it with boundary
+      },
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  getInvoiceTemplate: async (token) => {
+    const res = await fetch(`${API_BASE}/invoices/template`, {
       headers: getHeaders(token)
     });
     if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch invoice payments');
-    return res.json();
+    if (!res.ok) throw new Error('Failed to download template');
+    return res.blob();
   },
 
   // Medicines
   getMedicines: async (token) => {
     const res = await fetch(`${API_BASE}/medicines/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch medicines');
-    return res.json();
+    return handleResponse(res);
   },
 
   saveMedicine: async (token, medicineData, id = null) => {
@@ -239,9 +237,7 @@ export const api = {
       headers: getHeaders(token),
       body: JSON.stringify(medicineData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save medicine');
-    return res.json();
+    return handleResponse(res);
   },
 
   deleteMedicine: async (token, id) => {
@@ -249,16 +245,13 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Failed to delete medicine');
-    return res.json();
+    return handleResponse(res);
   },
 
   // Manufacturers
   getManufacturers: async (token) => {
     const res = await fetch(`${API_BASE}/manufacturers/`, { headers: getHeaders(token) });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to fetch manufacturers');
-    return res.json();
+    return handleResponse(res);
   },
 
   saveManufacturer: async (token, manufacturerData, id = null) => {
@@ -268,9 +261,7 @@ export const api = {
       headers: getHeaders(token),
       body: JSON.stringify(manufacturerData)
     });
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) throw new Error('Failed to save manufacturer');
-    return res.json();
+    return handleResponse(res);
   },
 
   deleteManufacturer: async (token, id) => {
@@ -278,9 +269,37 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders(token)
     });
-    if (!res.ok) throw new Error('Failed to delete manufacturer');
-    return res.json();
+    return handleResponse(res);
+  },
+
+  // Dispensing
+  getDispensingPrice: async (medicineId, token) => {
+    const res = await fetch(`${API_BASE}/dispensing/price/${medicineId}`, {
+      headers: getHeaders(token)
+    });
+    return handleResponse(res);
+  },
+
+  uploadDispensing: async (token, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/dispensing/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  getDispensingTemplate: async (token) => {
+    const res = await fetch(`${API_BASE}/dispensing/template`, {
+      headers: getHeaders(token)
+    });
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok) throw new Error('Failed to download template');
+    return res.blob();
   }
 };
 
 export default api;
+

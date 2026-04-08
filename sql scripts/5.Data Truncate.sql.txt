@@ -1,0 +1,25 @@
+-- Disable triggers temporarily to avoid constraint errors
+SET session_replication_role = 'replica';
+-- Truncate all data tables and reset ID counters
+TRUNCATE TABLE 
+    public.dispensing,
+    public.invoice_line_items,
+    public.invoice_payments,
+    public.invoices,
+    public.stock_adjustments,
+    public.stock_batches,
+    public.medicine_stock,
+    public.medicines,
+    public.manufacturers,
+    public.supplier_bank_accounts,
+    public.supplier_contact_details,
+    public.suppliers
+RESTART IDENTITY CASCADE;
+-- Re-enable triggers
+SET session_replication_role = 'origin';
+-- Verification counts (should all be 0)
+SELECT 'Invoices' as tbl, count(*) FROM invoices
+UNION ALL SELECT 'Stock Batches', count(*) FROM stock_batches
+UNION ALL SELECT 'Medicines', count(*) FROM medicines
+UNION ALL SELECT 'Suppliers', count(*) FROM suppliers
+UNION ALL SELECT 'Dispensing', count(*) FROM dispensing;

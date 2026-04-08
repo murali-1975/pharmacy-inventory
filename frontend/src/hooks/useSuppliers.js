@@ -22,12 +22,11 @@ export const useSuppliers = (token, onUnauthorized) => {
       const data = await api.getSuppliers(token);
       setSuppliers(data);
     } catch (err) {
-      if (err.message === 'Unauthorized') onUnauthorized();
-      else console.error('Failed to fetch suppliers', err);
+      console.error('Failed to fetch suppliers', err);
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token]);
 
   /**
    * Creates a new supplier or updates an existing one.
@@ -42,11 +41,10 @@ export const useSuppliers = (token, onUnauthorized) => {
       await fetchSuppliers();
       return true;
     } catch (err) {
-      if (err.message === 'Unauthorized') onUnauthorized();
-      else alert(err.message || 'Failed to save supplier');
+      alert(err.message || 'Failed to save supplier');
       return false;
     }
-  }, [token, fetchSuppliers, onUnauthorized]);
+  }, [token, fetchSuppliers]);
 
   /**
    * Deletes a supplier by ID after confirmation.
@@ -59,10 +57,9 @@ export const useSuppliers = (token, onUnauthorized) => {
       await api.deleteSupplier(token, id);
       await fetchSuppliers();
     } catch (err) {
-      if (err.message === 'Unauthorized') onUnauthorized();
-      else alert(err.message || 'Failed to delete supplier');
+      alert(err.message || 'Failed to delete supplier');
     }
-  }, [token, fetchSuppliers, onUnauthorized]);
+  }, [token, fetchSuppliers]);
 
   return {
     suppliers,

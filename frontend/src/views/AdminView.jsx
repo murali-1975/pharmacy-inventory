@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Users, Tag, Activity } from 'lucide-react';
+import { Users, Tag, Activity, Package } from 'lucide-react';
 import UsersView from './UsersView';
 import SupplierTypesView from './SupplierTypesView';
 import StatusView from './StatusView';
 import ManufacturersView from './ManufacturersView';
 import MedicinesView from './MedicinesView';
+import StockView from './StockView';
 
 /**
  * Administrative Hub component that provides tabs for managing users, medicines,
@@ -37,16 +38,16 @@ const AdminView = ({
     statuses, onSaveStatus, onDeleteStatus,
     manufacturers, onAddManufacturer, onEditManufacturer, onDeleteManufacturer,
     medicines, onAddMedicineMaster, onEditMedicineMaster, onDeleteMedicineMaster,
-    currentUser
+    currentUser, token
 }) => {
     const [activeTab, setActiveTab] = useState('users');
 
     const tabs = [
         { id: 'users', name: 'Users', icon: Users, count: users?.length },
-        { id: 'medicines', name: 'Medicine Master', icon: Activity, count: medicines?.length }, // Using Activity as icon since Package is in sidebar or import it
+        { id: 'medicines', name: 'Medicine Master', icon: Activity, count: medicines?.length },
         { id: 'manufacturers', name: 'Manufacturers', icon: Tag, count: manufacturers?.length },
         { id: 'types', name: 'Supplier Types', icon: Tag, count: supplierTypes?.length },
-        { id: 'status', name: 'Statuses', icon: Activity, count: statuses?.length }
+        { id: 'status', name: 'Statuses', icon: Activity, count: statuses?.length },
     ];
 
     return (

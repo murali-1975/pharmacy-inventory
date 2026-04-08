@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
-from app import models, database, auth, schemas
+from app import models, database, auth, schemas, utils
 from app.core.logging_config import logger
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
@@ -21,11 +21,8 @@ def get_suppliers(db: Session = Depends(database.get_db), current_user: models.U
     """
     List all suppliers and their primary details.
     """
-    try:
+    with utils.db_error_handler("suppliers retrieval"):
         return db.query(models.Supplier).all()
-    except SQLAlchemyError as e:
-        logger.error(f"Database error during suppliers retrieval: {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not retrieve suppliers from database")
 
 @router.post("/", response_model=schemas.SupplierSchema)
 @router.post("", response_model=schemas.SupplierSchema, include_in_schema=False)
@@ -38,7 +35,7 @@ def create_supplier(
     Create a new supplier with optional nested contact and bank details.
     Requires: Admin or Manager role.
     """
-    try:
+    with utils.db_error_handler("supplier creation", db):
         db_supplier = models.Supplier(
             supplier_name=supplier_in.supplier_name,
             type_id=supplier_in.type_id,
@@ -66,10 +63,6 @@ def create_supplier(
         db.refresh(db_supplier)
         logger.info(f"User {current_user.username} created supplier: {db_supplier.supplier_name} (ID: {db_supplier.id})")
         return db_supplier
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error during supplier creation: {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not create supplier in database")
 
 @router.put("/{supplier_id}/", response_model=schemas.SupplierSchema)
 @router.put("/{supplier_id}", response_model=schemas.SupplierSchema, include_in_schema=False)
@@ -84,7 +77,7 @@ def update_supplier(
     Requires: Admin or Manager role.
     Logic: Syncs contact details and rebuilds bank account list.
     """
-    try:
+    with utils.db_error_handler(f"supplier update (ID: {supplier_id})", db):
         db_supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
         if not db_supplier:
             logger.warning(f"Supplier update failed: ID {supplier_id} not found.")
@@ -120,10 +113,6 @@ def update_supplier(
         db.refresh(db_supplier)
         logger.info(f"User {current_user.username} updated supplier: {db_supplier.supplier_name} (ID: {supplier_id})")
         return db_supplier
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error during supplier update (ID: {supplier_id}): {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not update supplier in database")
 
 @router.delete("/{supplier_id}/")
 @router.delete("/{supplier_id}", include_in_schema=False)
@@ -136,7 +125,7 @@ def delete_supplier(
     Permanently delete a supplier and all its associated records (cascade delete).
     Requires: Admin role.
     """
-    try:
+    with utils.db_error_handler(f"supplier deletion (ID: {supplier_id})", db):
         db_supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
         if not db_supplier:
             logger.warning(f"Supplier deletion failed: ID {supplier_id} not found.")
@@ -147,7 +136,3 @@ def delete_supplier(
         db.commit()
         logger.info(f"Admin {current_user.username} deleted supplier: {name} (ID: {supplier_id})")
         return {"message": "Supplier deleted successfully"}
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error during supplier deletion (ID: {supplier_id}): {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not delete supplier from database")

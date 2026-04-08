@@ -7,14 +7,21 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
     generic_name: '',
     manufacturer_id: '',
     hsn_code: '',
-    category: 'General',
+    category: 'GENERAL',
     uom: 'Strip',
     storage_type: 'Ambient',
     description: '',
-    unit_price: 0
+    unit_price: 0,
+    selling_price_percent: 0
   });
 
-  const categories = ["Scheduled H", "Scheduled H1", "Scheduled X", "OTC", "General"];
+  const categories = [
+    { label: "General", value: "GENERAL" },
+    { label: "OTC", value: "OTC" },
+    { label: "Scheduled H", value: "SCHEDULE_H" },
+    { label: "Scheduled H1", value: "SCHEDULE_H1" },
+    { label: "Scheduled X", value: "SCHEDULE_X" }
+  ];
   const uoms = ["Strip", "Bottle", "Vial", "Each"];
   const storageTypes = ["Ambient", "Cold Chain (2-8°C)", "Controlled"];
 
@@ -98,7 +105,7 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
               value={formData.category}
               onChange={(e) => setFormData({...formData, category: e.target.value})}
             >
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
         </div>
@@ -130,7 +137,7 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-4">
         <div className="space-y-2">
           <label className="text-sm font-bold text-gray-700">Unit Price (₹)</label>
           <div className="relative group">
@@ -143,6 +150,21 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
               value={formData.unit_price || 0}
               onChange={(e) => setFormData({...formData, unit_price: parseFloat(e.target.value) || 0})}
               placeholder="0.00"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-gray-700">Selling Price %</label>
+          <div className="relative group">
+            <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-green-500 group-focus-within:text-green-600 transition-colors" size={18} />
+            <input 
+              type="number"
+              step="0.01"
+              required
+              className="w-full bg-green-50/30 border border-green-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-green-500/10 focus:border-green-500 outline-none transition-all font-bold text-green-700"
+              value={formData.selling_price_percent || 0}
+              onChange={(e) => setFormData({...formData, selling_price_percent: parseFloat(e.target.value) || 0})}
+              placeholder="0"
             />
           </div>
         </div>

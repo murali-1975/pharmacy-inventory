@@ -5,24 +5,27 @@ export const useAuth = () => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [currentUser, setCurrentUser] = useState(null);
   const [authError, setAuthError] = useState('');
+  const [logoutReason, setLogoutReason] = useState(null);
 
   const login = useCallback(async (username, password) => {
     try {
       setAuthError('');
+      setLogoutReason(null);
       const data = await api.login(username, password);
       localStorage.setItem('token', data.access_token);
       setToken(data.access_token);
       return true;
     } catch (err) {
-      setAuthError('Invalid username or password');
+      setAuthError(err.message || 'Invalid username or password');
       return false;
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback((reason = null) => {
     localStorage.removeItem('token');
     setToken(null);
     setCurrentUser(null);
+    if (reason) setLogoutReason(reason);
   }, []);
 
   const fetchMe = useCallback(async () => {
@@ -32,7 +35,7 @@ export const useAuth = () => {
       setCurrentUser(user);
     } catch (err) {
       if (err.message === 'Unauthorized') {
-        logout();
+        logout('session_expired');
       }
     }
   }, [token, logout]);
@@ -41,9 +44,11 @@ export const useAuth = () => {
     token,
     currentUser,
     authError,
+    logoutReason,
     login,
     logout,
     fetchMe,
-    setAuthError
+    setAuthError,
+    setLogoutReason
   };
 };

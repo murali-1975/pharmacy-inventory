@@ -1,6 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Calendar, FileText, User, CreditCard, Tag, Package } from 'lucide-react';
 
+const MedicineAutocomplete = ({ medicines, value, onChange }) => {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  // Initialize query from value
+  useEffect(() => {
+    if (value) {
+      const med = medicines.find(m => m.id === value);
+      if (med) setQuery(med.product_name);
+    } else {
+      setQuery('');
+    }
+  }, [value, medicines]);
+
+  const filteredMedicines = query === '' 
+    ? [] 
+    : medicines.filter(m => m.product_name.toLowerCase().includes(query.toLowerCase()) || (m.generic_name && m.generic_name.toLowerCase().includes(query.toLowerCase()))).slice(0, 50);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        required={!value}
+        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+        placeholder="Type to search medicines..."
+        value={query}
+        onChange={(e) => {
+           setQuery(e.target.value);
+           setIsOpen(true);
+           setHighlightedIndex(0);
+           if (!e.target.value) onChange(''); // clear back to empty state
+        }}
+        onFocus={() => {
+           if (query) setIsOpen(true);
+        }}
+        onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+        onKeyDown={(e) => {
+          if (!isOpen || filteredMedicines.length === 0) return;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex(prev => Math.min(prev + 1, filteredMedicines.length - 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex(prev => Math.max(prev - 1, 0));
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            onChange(filteredMedicines[highlightedIndex].id);
+            setQuery(filteredMedicines[highlightedIndex].product_name);
+            setIsOpen(false);
+          } else if (e.key === 'Escape') {
+            setIsOpen(false);
+          }
+        }}
+      />
+      {isOpen && filteredMedicines.length > 0 && (
+        <ul className="absolute z-[100] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto left-0">
+          {filteredMedicines.map((item, index) => (
+            <li
+              key={item.id}
+              className={`px-4 py-3 text-sm cursor-pointer transition-colors ${
+                index === highlightedIndex ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+              onMouseEnter={() => setHighlightedIndex(index)}
+              onMouseDown={(e) => {
+                e.preventDefault(); // prevent blur
+                onChange(item.id);
+                setQuery(item.product_name);
+                setIsOpen(false);
+              }}
+            >
+              <div className="flex flex-col">
+                <span>{item.product_name}</span>
+                {item.generic_name && <span className="text-[10px] text-gray-400 font-bold mt-0.5">{item.generic_name}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 const InvoiceForm = ({ 
   onSave, 
   initialData, 
@@ -29,7 +112,7 @@ const InvoiceForm = ({
   }, [initialData]);
 
   const selectedSupplier = suppliers.find(s => s.id === parseInt(formData.supplier_id));
-  const isPharmacy = selectedSupplier?.type_id === 2;
+  const isPharmacy = [1, 2, 3].includes(selectedSupplier?.type_id) || selectedSupplier?.type?.name?.toLowerCase().includes('pharma') || selectedSupplier?.type?.name?.toLowerCase().includes('wholesale') || selectedSupplier?.type?.name?.toLowerCase().includes('retail');
 
   const addLineItem = () => {
     setFormData({
@@ -40,8 +123,12 @@ const InvoiceForm = ({
           medicine_id: isPharmacy ? '' : null, 
           description: isPharmacy ? '' : '', 
           quantity: 1, 
+          free_quantity: 0,
           price: 0, 
           discount: 0, 
+          mrp: 0,
+          gst: 0,
+          batch_no: isPharmacy ? '' : null,
           expiry_date: isPharmacy ? '' : null 
         }
       ]
@@ -62,7 +149,7 @@ const InvoiceForm = ({
 
   const calculateTotal = () => {
     const total = formData.line_items.reduce((acc, item) => {
-      const lineTotal = (item.quantity * item.price) - (item.discount || 0);
+      const lineTotal = (item.quantity * item.price);
       return acc + lineTotal;
     }, 0);
     return total + (parseFloat(formData.gst) || 0);
@@ -206,86 +293,140 @@ const InvoiceForm = ({
                 <Trash2 size={14} />
               </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                {isPharmacy ? (
-                  <>
-                    <div className="md:col-span-4 space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">Medicine</label>
-                      <select
-                        required
-                        className="w-full bg-white border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none"
-                        value={item.medicine_id}
-                        onChange={(e) => updateLineItem(index, 'medicine_id', parseInt(e.target.value))}
-                      >
-                        <option value="">Select Medicine</option>
-                        {medicines.map(m => (
-                          <option key={m.id} value={m.id}>{m.product_name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="md:col-span-3 space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">Expiry Date</label>
+              <div className="space-y-4">
+                {/* Row 1: Item, Batch, Expiry */}
+                <div className="grid grid-cols-12 gap-3 items-end">
+                  {isPharmacy ? (
+                    <>
+                      <div className="col-span-6 md:col-span-5 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Item Description</label>
+                        <MedicineAutocomplete
+                          medicines={medicines}
+                          value={item.medicine_id}
+                          onChange={(val) => updateLineItem(index, 'medicine_id', val)}
+                        />
+                      </div>
+                      <div className="col-span-3 md:col-span-3 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Batch No</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. BATCH-A1"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                          value={item.batch_no || ''}
+                          onChange={(e) => updateLineItem(index, 'batch_no', e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-3 md:col-span-4 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Expiry Date</label>
+                        <div className="relative">
+                          <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                          <input
+                            type="date"
+                            required
+                            className="w-full bg-white border border-gray-200 rounded-xl pl-3 pr-10 py-2.5 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none"
+                            value={item.expiry_date || ''}
+                            onChange={(e) => updateLineItem(index, 'expiry_date', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="col-span-12 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Item Description</label>
                       <input
-                        type="date"
+                        type="text"
                         required
-                        className="w-full bg-white border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none"
-                        value={item.expiry_date}
-                        onChange={(e) => updateLineItem(index, 'expiry_date', e.target.value)}
+                        placeholder="Enter item description..."
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                        value={item.description}
+                        onChange={(e) => updateLineItem(index, 'description', e.target.value)}
                       />
                     </div>
-                  </>
-                ) : (
-                  <div className="md:col-span-7 space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Item Description</label>
+                  )}
+                </div>
+
+                {/* Row 2: Qty, Free Qty, Price, MRP, GST, Disc, Total */}
+                <div className="flex flex-wrap gap-x-3 gap-y-4 items-end pt-2 border-t border-gray-100/50">
+                  <div className="flex-1 min-w-[70px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase text-center block">Qty</label>
                     <input
-                      type="text"
+                      type="number"
                       required
-                      placeholder="Enter item description..."
-                      className="w-full bg-white border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(index, 'description', e.target.value)}
+                      min="1"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none text-center"
+                      value={item.quantity}
+                      onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 0)}
                     />
                   </div>
-                )}
 
-                <div className="md:col-span-1 space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase text-center block">Qty</label>
-                  <input
-                    type="number"
-                    required
-                    className="w-full bg-white border border-gray-100 rounded-xl px-2 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none text-center"
-                    value={item.quantity}
-                    onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                  />
-                </div>
+                  <div className="flex-1 min-w-[70px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase text-center block">Free Qty</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none text-center"
+                      value={item.free_quantity || 0}
+                      onChange={(e) => updateLineItem(index, 'free_quantity', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
 
-                <div className="md:col-span-1.5 space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Price (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    className="w-full bg-white border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none"
-                    value={item.price}
-                    onChange={(e) => updateLineItem(index, 'price', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
+                  <div className="flex-[1.2] min-w-[90px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Price (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                      value={item.price}
+                      onChange={(e) => updateLineItem(index, 'price', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
 
-                <div className="md:col-span-1.5 space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Disc (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full bg-white border border-gray-100 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 outline-none"
-                    value={item.discount}
-                    onChange={(e) => updateLineItem(index, 'discount', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
+                  <div className="flex-[1.2] min-w-[90px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">MRP (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                      value={item.mrp || 0}
+                      onChange={(e) => updateLineItem(index, 'mrp', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
 
-                <div className="md:col-span-1 space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase">Total</label>
-                  <div className="text-sm font-black text-blue-600 h-[38px] flex items-center">
-                    ₹{((item.quantity * item.price) - (item.discount || 0)).toLocaleString()}
+                  <div className="flex-1 min-w-[70px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">GST %</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                      value={item.gst || 0}
+                      onChange={(e) => updateLineItem(index, 'gst', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-[70px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Disc (₹)</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*\.?[0-9]*"
+                      className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none"
+                      value={item.discount}
+                      onChange={(e) => updateLineItem(index, 'discount', parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-[100px] space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase text-right block">Line Total</label>
+                    <div className="text-[13px] font-black text-blue-600 h-[42px] flex items-center justify-end pr-2">
+                        ₹{(item.quantity * item.price).toFixed(2)}
+                    </div>
                   </div>
                 </div>
               </div>

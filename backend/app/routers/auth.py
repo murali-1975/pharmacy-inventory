@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from app import models, database, auth, schemas
+from app import models, database, auth, schemas, utils
 from app.core.logging_config import logger
 
 router = APIRouter(tags=["Authentication"])
@@ -16,7 +16,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
     Checks if the username is already taken, hashes the password, 
     and saves the new user with an 'Active' status by default.
     """
-    try:
+    with utils.db_error_handler("user registration", db):
         db_user = db.query(models.User).filter(models.User.username == user.username).first()
         if db_user:
             logger.warning(f"Registration failed: Username '{user.username}' already exists.")
@@ -36,15 +36,6 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         db.refresh(new_user)
         logger.info(f"Successfully registered new user: {user.username} with role {user.role}")
         return new_user
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Database error during user registration: {str(e)}")
-        raise HTTPException(status_code=500, detail="Database error occurred during registration")
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        logger.error(f"Unexpected error during registration: {str(e)}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 @router.post("/token/", response_model=schemas.Token)
 @router.post("/token", response_model=schemas.Token, include_in_schema=False)
@@ -52,12 +43,22 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """
     Authenticate user and return a JWT access token.
     """
-    user = db.query(models.User).filter(models.User.username == form_data.username).first()
-    if not user or not auth.verify_password(form_data.password, user.hashed_password):
-        logger.warning(f"Failed login attempt for username: {form_data.username}")
+    with utils.db_error_handler("login authentication"):
+        user = db.query(models.User).filter(models.User.username == form_data.username).first()
+        
+        if not user:
+            logger.warning(f"Failed login attempt: Username '{form_data.username}' not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="We couldn't find an account with that username.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    if not auth.verify_password(form_data.password, user.hashed_password):
+        logger.warning(f"Failed login attempt for username: {form_data.username} - Incorrect password.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="The password you entered is incorrect. Please try again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

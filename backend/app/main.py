@@ -1,31 +1,50 @@
 """
 Main Application Entry Point.
-Initializes the FastAPI app, configures global middleware (CORS, Logging), 
-registers exception handlers, and mounts API routers.
+
+Initializes the FastAPI application with:
+  - Global middleware: CORS, request logging
+  - Exception handlers: validation errors, DB errors, and catch-all
+  - Lifespan events: database table creation and seed data on startup
+  - Router registration for all API domains
 """
+from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from . import models, database
-from .routers import auth, suppliers, lookups, users, invoices, medicines, manufacturers
+from .routers import auth, suppliers, lookups, users, invoices, medicines, manufacturers, stock, dispensing, analytics, financials
 from .core.config import settings
 from .core.logging_config import LoggingMiddleware, logger
+from . import seed
 
-# Initialize database tables on startup (Synchronous for simplicity in current setup)
+# Initialize database tables synchronously before app startup
 models.Base.metadata.create_all(bind=database.engine)
 
-app = FastAPI(title=settings.APP_NAME)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application startup and shutdown lifecycle events."""
+    logger.info(f"Starting {settings.APP_NAME}...")
+    # Seed essential lookup data and default admin account
+    # Skip seeding during test runs to avoid fixture conflicts
+    if not os.getenv("PYTEST_CURRENT_TEST"):
+        db = database.SessionLocal()
+        try:
+            seed.seed_database(db)
+        finally:
+            db.close()
+    yield
+    # Shutdown: nothing to clean up in this setup
+    logger.info(f"{settings.APP_NAME} shutting down.")
 
-# Robust CORS Configuration: Allow specific origins for local development and testing
-origins = [
-    "http://localhost:5173", "http://127.0.0.1:5173",
-    "http://localhost:5174", "http://127.0.0.1:5174",
-    "http://localhost:5175", "http://127.0.0.1:5175",
-    "http://localhost:5176", "http://127.0.0.1:5176",
-    "http://localhost:3000", "http://127.0.0.1:3000",
-]
+app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+
+# CORS Configuration: Allow specific origins for development and production
+# CORS Configuration: Allow all origins for simplified LAN access.
+# Since we are using an Nginx proxy, the Origin header will match the host's IP/Hostname.
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,22 +55,6 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Universal CORS Middleware: Ensures CORS headers are present even on redirects or server errors.
-@app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
-    origin = request.headers.get("origin")
-    response = await call_next(request)
-    if origin in origins:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
-
-@app.on_event("startup")
-async def startup_event():
-    """Log application startup details."""
-    logger.info(f"Starting {settings.APP_NAME}...")
 
 # --- Global Exception Handlers ---
 
@@ -90,8 +93,21 @@ app.include_router(users.router)
 app.include_router(invoices.router)
 app.include_router(medicines.router)
 app.include_router(manufacturers.router)
+app.include_router(stock.router)
+app.include_router(dispensing.router)
+app.include_router(analytics.router)
+app.include_router(financials.router)
 
 @app.get("/")
 def read_root():
-    """API health check endpoint."""
+    """API root — basic sanity check that the service is reachable."""
     return {"message": "Welcome to Pharmacy Inventory API"}
+
+@app.get("/health", tags=["Health"])
+def health_check():
+    """
+    Lightweight health check for container orchestration (Docker, Kubernetes).
+    Returns 200 OK when the application process is running.
+    The database connectivity check is handled at startup via seeding.
+    """
+    return {"status": "healthy", "service": settings.APP_NAME}

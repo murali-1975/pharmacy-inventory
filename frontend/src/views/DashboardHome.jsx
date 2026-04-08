@@ -1,18 +1,84 @@
-import React from 'react';
-import { Package, Building2, TrendingUp, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, CreditCard, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { StatCard } from '../components/common/Common';
 
-const DashboardHome = ({ setView, invoices = [] }) => {
+const DashboardHome = ({ setView, invoices = [], token }) => {
+  const [stats, setStats] = useState({
+    total_medicines: 0,
+    pending_invoices_amount: 0,
+    monthly_procurement: 0,
+    low_stock_alerts: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/analytics/stats', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchStats();
+    }
+  }, [token]);
+
   const recentInvoices = invoices.slice(0, 5);
   
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
   return (
     <>
     {/* Stats Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <StatCard icon={Package} label="Total Medicines" value="248" trend={12} color="bg-blue-500" subValue="items" />
-      <StatCard icon={Building2} label="Active Suppliers" value="16" trend={0} color="bg-indigo-500" subValue="vendors" />
-      <StatCard icon={TrendingUp} label="Monthly Procurement" value="₹1,45,210" trend={8.2} color="bg-green-500" />
-      <StatCard icon={AlertCircle} label="Low Stock Alert" value="24" trend={-2} color="bg-orange-500" />
+      <StatCard 
+        icon={Package} 
+        label="Total Medicines" 
+        value={stats.total_medicines.toString()} 
+        trend={12} 
+        color="bg-blue-500" 
+        subValue="in stock" 
+      />
+      <StatCard 
+        icon={CreditCard} 
+        label="Pending Payments" 
+        value={`₹${stats.pending_invoices_amount.toLocaleString()}`} 
+        trend={0} 
+        color="bg-indigo-500" 
+        subValue="to be paid" 
+      />
+      <StatCard 
+        icon={TrendingUp} 
+        label="Monthly Procurement" 
+        value={`₹${stats.monthly_procurement.toLocaleString()}`} 
+        trend={8.2} 
+        color="bg-green-500" 
+      />
+      <StatCard 
+        icon={AlertCircle} 
+        label="Low Stock Alert" 
+        value={stats.low_stock_alerts.toString()} 
+        trend={-2} 
+        color="bg-orange-500" 
+      />
     </div>
 
     {/* Recent Activities & Quick Actions */}

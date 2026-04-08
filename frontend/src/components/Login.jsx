@@ -3,7 +3,7 @@ import { Pill, User, Lock, ArrowRight, AlertCircle, Loader2 } from 'lucide-react
 import { api } from '../api';
 import logo from '../assets/omniflow_logo.png';
 
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, error: propError, logoutReason }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -67,12 +67,18 @@ const Login = ({ onLogin }) => {
             </p>
           </div>
 
-          {error && (
+          {(error || propError || logoutReason) && (
             <div className={`mb-6 p-4 rounded-2xl flex items-center space-x-3 text-sm animate-in zoom-in duration-300 ${
-              error.includes('successful') ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
+              (error || propError || '').includes('successful') 
+                ? 'bg-green-50 text-green-700 border border-green-100' 
+                : (logoutReason === 'session_expired' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-red-50 text-red-700 border border-red-100')
             }`}>
-              {error.includes('successful') ? <AlertCircle className="text-green-500" size={18} /> : <AlertCircle className="text-red-500" size={18} />}
-              <span className="font-medium">{error}</span>
+              {(error || propError || '').includes('successful') 
+                ? <AlertCircle className="text-green-500" size={18} /> 
+                : (logoutReason === 'session_expired' ? <AlertCircle className="text-amber-500" size={18} /> : <AlertCircle className="text-red-500" size={18} />)}
+              <span className="font-medium">
+                {error || propError || (logoutReason === 'session_expired' ? 'Your session has expired. Please login again.' : '')}
+              </span>
             </div>
           )}
 

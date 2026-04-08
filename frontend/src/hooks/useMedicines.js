@@ -15,17 +15,27 @@ export const useMedicines = (token, onUnauthorized) => {
   /**
    * Fetches the list of medicines from the backend.
    */
-  const fetchMedicines = useCallback(async () => {
+  const fetchMedicines = useCallback(async (retries = 2, delay = 1000) => {
     if (!token) return;
     setLoading(true);
+    let success = false;
     try {
       const data = await api.getMedicines(token);
       setMedicines(data);
+      success = true;
     } catch (err) {
-      if (err.message === 'Unauthorized') onUnauthorized();
-      else console.error('Failed to fetch medicines', err);
+      if (err.message === 'Unauthorized') {
+        onUnauthorized();
+      } else if (retries > 0) {
+        console.warn(`Fetch medicines failed, retrying in ${delay}ms...`, err);
+        setTimeout(() => fetchMedicines(retries - 1, delay * 2), delay);
+      } else {
+        console.error('Failed to fetch medicines after retries', err);
+      }
     } finally {
-      setLoading(false);
+      if (success || retries === 0) {
+        setLoading(false);
+      }
     }
   }, [token, onUnauthorized]);
 
