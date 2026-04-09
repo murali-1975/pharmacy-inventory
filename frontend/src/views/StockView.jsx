@@ -240,8 +240,8 @@ export default function StockView({ medicinesList = [], token, userRole }) {
       const allItems = data.items;
 
       const doc = new jsPDF('p', 'mm', 'a4');
-      const dateStr = new Date().toLocaleDateString();
-      const timeStr = new Date().toLocaleTimeString();
+      const dateStr = formatDate(new Date());
+      const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
       // Styling and Content
       doc.setFontSize(22);
@@ -250,7 +250,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
 
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Generated on: ${dateStr} ${timeStr}`, 14, 30);
+      doc.text(`Generated on: ${dateStr} at ${timeStr}`, 14, 30);
       doc.text(`Total Records: ${data.total}`, 14, 36);
 
       const tableData = allItems.map((item, index) => [
@@ -259,48 +259,57 @@ export default function StockView({ medicinesList = [], token, userRole }) {
         item.medicine?.generic_name || "—",
         item.medicine?.category || "—",
         item.quantity_on_hand.toString(),
-        `RS. ${item.unit_price?.toFixed(0) || "0"}`,
+        `Rs. ${item.unit_price?.toFixed(2) || "0.00"}`,
         `${item.gst_percent || 0}%`,
       ]);
 
       autoTable(doc, {
         startY: 45,
-        head: [['S.No', 'Product Name', 'Generic Name', 'Category', 'Stock Qty', 'Unit Price', 'GST %']],
+        head: [['S.No', 'Product Name', 'Generic Name', 'Category', 'Stock', 'Unit Price', 'GST']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [6, 148, 162], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [247, 250, 252] },
-        styles: { fontSize: 9, cellPadding: 4, font: 'helvetica' },
+        styles: { fontSize: 8.5, cellPadding: 3, font: 'helvetica', overflow: 'linebreak' },
         columnStyles: {
-            0: { cellWidth: 12, halign: 'center' }, // S.No
+            0: { cellWidth: 10, halign: 'center' }, // S.No
             1: { cellWidth: 40 }, // Product Name
-            2: { cellWidth: 40 }, // Generic Name
-            4: { halign: 'center', cellWidth: 20 },
-            5: { halign: 'right', fontStyle: 'bold', cellWidth: 25 },
-            6: { halign: 'center', cellWidth: 15 },
+            2: { cellWidth: 'auto' }, // Generic Name (flexible wrapping)
+            3: { cellWidth: 25 }, // Category
+            4: { halign: 'center', cellWidth: 15 }, // Qty
+            5: { halign: 'right', fontStyle: 'bold', cellWidth: 25 }, // Price
+            6: { halign: 'center', cellWidth: 12 }, // GST
         },
-        margin: { top: 45, bottom: 20 },
+        margin: { top: 45, bottom: 20, left: 14, right: 14 },
         didDrawPage: (data) => {
             // Footer with page numbering
             const str = "Page " + doc.internal.getNumberOfPages();
-            doc.setFontSize(10);
+            doc.setFontSize(9);
             doc.setTextColor(150);
             doc.text(str, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
             doc.text("Pharmacy Inventory System", 14, doc.internal.pageSize.height - 10);
         }
       });
 
-      const fileName = `PriceList_${new Date().toISOString().split('T')[0]}.pdf`;
+      const fileName = `PriceList_${dateStr.replace(/\//g, '-')}.pdf`;
       
-      // Use Blob and anchor tagging for more robust file naming across browsers
-      const blob = doc.output('blob');
-      const url = URL.createObjectURL(blob);
+      // Robust "bulletproof" download trigger to ensure browsers respect the filename
+      const pdfBlob = doc.output('blob');
+      const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      
+      if (link.download !== undefined) {
+        link.href = url;
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Fallback for very specific browser configurations
+        doc.save(fileName);
+      }
+      
       URL.revokeObjectURL(url);
 
       setSuccess("Full Price List exported as PDF successfully!");
