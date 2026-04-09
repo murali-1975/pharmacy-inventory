@@ -66,7 +66,7 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
   // Find the selected medicine name for display when not searching
   const selectedMed = medicines.find(m => String(m.id) === String(value));
   const displayName = selectedMed 
-    ? `${selectedMed.product_name} (${selectedMed.quantity_on_hand})${selectedMed.generic_name ? ` (${selectedMed.generic_name})` : ""}`
+    ? `${selectedMed.product_name} (${selectedMed.quantity_on_hand})`
     : "";
 
   const filtered = medicines.filter(m => 
