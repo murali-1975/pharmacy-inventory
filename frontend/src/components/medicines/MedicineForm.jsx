@@ -34,10 +34,11 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Product Name (Brand)</label>
+          <label htmlFor="product_name" className="text-sm font-bold text-gray-700">Product Name (Brand)</label>
           <div className="relative group">
             <Package className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="product_name"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={formData.product_name || ''}
@@ -47,10 +48,11 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Generic Name (Salt)</label>
+          <label htmlFor="generic_name" className="text-sm font-bold text-gray-700">Generic Name (Salt)</label>
           <div className="relative group">
             <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="generic_name"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={formData.generic_name || ''}
@@ -63,10 +65,11 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Manufacturer</label>
+          <label htmlFor="manufacturer_id" className="text-sm font-bold text-gray-700">Manufacturer</label>
           <div className="relative group">
             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <select 
+              id="manufacturer_id"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all appearance-none"
               value={formData.manufacturer_id || ''}
@@ -80,10 +83,11 @@ const MedicineForm = ({ initialData, manufacturers, onSave, onCancel }) => {
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">HSN Code</label>
+          <label htmlFor="hsn_code" className="text-sm font-bold text-gray-700">HSN Code</label>
           <div className="relative group">
             <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="hsn_code"
               required
               maxLength={8}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"

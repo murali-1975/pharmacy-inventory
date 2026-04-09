@@ -40,3 +40,13 @@ Thumbs.db
 backend/server_logs*.txt
 backend/logs/
 frontend/dist/
+
+*.log
+*.txt
+backend/test_pharmacy_inventory.db
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+pharmacy_backup_*.sql
+untracked_files.txt
+modified_files.txt

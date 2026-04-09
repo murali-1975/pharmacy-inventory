@@ -25,10 +25,11 @@ const UserForm = ({
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Username</label>
+          <label htmlFor="user-username" className="text-sm font-bold text-gray-700">Username</label>
           <div className="relative group">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="user-username"
               required
               disabled={isEdit}
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all disabled:opacity-50"
@@ -39,10 +40,11 @@ const UserForm = ({
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Email Address</label>
+          <label htmlFor="user-email" className="text-sm font-bold text-gray-700">Email Address</label>
           <div className="relative group">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="user-email"
               required
               type="email"
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
@@ -56,10 +58,11 @@ const UserForm = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Role</label>
+          <label htmlFor="user-role" className="text-sm font-bold text-gray-700">Role</label>
           <div className="relative group">
             <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <select 
+              id="user-role"
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all appearance-none"
               value={formData.role}
               onChange={(e) => setFormData({...formData, role: e.target.value})}
@@ -71,10 +74,11 @@ const UserForm = ({
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">{isEdit ? 'New Password (optional)' : 'Password'}</label>
+          <label htmlFor="user-password" className="text-sm font-bold text-gray-700">{isEdit ? 'New Password (optional)' : 'Password'}</label>
           <div className="relative group">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="user-password"
               required={!isEdit}
               type="password"
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"

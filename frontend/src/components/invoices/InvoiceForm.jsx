@@ -167,10 +167,11 @@ const InvoiceForm = ({
         <div className="absolute top-0 left-0 w-2 h-full bg-blue-500/20" />
         
         <div className="space-y-2">
-          <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Supplier</label>
+          <label htmlFor="supplier_id" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Supplier</label>
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <select
+              id="supplier_id"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold appearance-none cursor-pointer"
               value={formData.supplier_id}
@@ -185,10 +186,11 @@ const InvoiceForm = ({
         </div>
 
         <div className="space-y-2">
-          <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Invoice Date</label>
+          <label htmlFor="invoice_date" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Invoice Date</label>
           <div className="relative">
             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
+              id="invoice_date"
               type="date"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold"
@@ -199,10 +201,11 @@ const InvoiceForm = ({
         </div>
 
         <div className="space-y-2">
-          <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Invoice Number</label>
+          <label htmlFor="reference_number" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Invoice Number</label>
           <div className="relative">
             <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
+              id="reference_number"
               type="text"
               required
               placeholder="e.g. INV-2024-001"
@@ -229,10 +232,11 @@ const InvoiceForm = ({
         </div>
 
         <div className="space-y-2">
-          <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Total Invoice Value (₹)</label>
+          <label htmlFor="total_value" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Total Invoice Value (₹)</label>
           <div className="relative">
             <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
+              id="total_value"
               type="number"
               step="0.01"
               required
@@ -372,8 +376,9 @@ const InvoiceForm = ({
                   </div>
 
                   <div className="flex-[1.2] min-w-[90px] space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Price (₹)</label>
+                    <label htmlFor={`price-${index}`} className="text-[10px] font-bold text-gray-400 uppercase">Price (₹)</label>
                     <input
+                      id={`price-${index}`}
                       type="number"
                       step="0.01"
                       min="0"

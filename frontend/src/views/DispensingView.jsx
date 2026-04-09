@@ -516,8 +516,9 @@ export default function DispensingView({ medicines = [], token, userRole }) {
           {/* ---- Header: Date + Patient (shared) ---- */}
           <div style={s.headerRow}>
             <div style={s.headerField}>
-              <label style={s.label}>Dispensing Date</label>
+              <label htmlFor="dispensed_date" style={s.label}>Dispensing Date</label>
               <input
+                id="dispensed_date"
                 type="date"
                 style={s.input}
                 value={header.dispensed_date}
@@ -526,8 +527,9 @@ export default function DispensingView({ medicines = [], token, userRole }) {
               />
             </div>
             <div style={{ ...s.headerField, flex: 2 }}>
-              <label style={s.label}>Patient Name</label>
+              <label htmlFor="patient_name" style={s.label}>Patient Name</label>
               <input
+                id="patient_name"
                 type="text"
                 style={s.input}
                 placeholder="e.g. Ravi Kumar / OP-0042"

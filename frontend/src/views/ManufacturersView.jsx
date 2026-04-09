@@ -10,7 +10,7 @@ const ManufacturersView = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filtered = manufacturers.filter(m => 
+  const filtered = (manufacturers || []).filter(m => 
     (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (m.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase())
   );

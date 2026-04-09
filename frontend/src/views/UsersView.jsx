@@ -9,7 +9,7 @@ const UsersView = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = (users || []).filter(u => 
     (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );

@@ -1,0 +1,24 @@
+- [x] Add `GET /status` to `backend/app/main.py`
+- [x] Update `backend/tests/conftest.py` with StaticPool and Seed
+- [x] Run initial backend tests and verify stability
+- [x] Backend Test Suite Synchronization (Phase 2) 
+    - [x] Import 110 tests from backup
+    - [x] Resolve seeding and import regressions
+    - [x] **Verification**: 110/110 passed, 79% coverage.
+- [x] Frontend Test Infrastructure (Phase 3)
+    - [x] Create `TestWrapper.jsx` helper
+    - [x] Implement `DashboardHome.jsx` defensive rendering (Fixed Crashes)
+    - [x] Install `react-router-dom` dependency
+    - [x] Fixed ambiguous selectors in `App.test.jsx` & `AuthSession.test.jsx`
+- [/] Frontend Coverage Expansion (Phase 4) [/]
+    - [x] Add `InvoicesView.test.jsx` (**60% coverage**)
+    - [x] Add `StockView.test.jsx` (**43% coverage**)
+    - [x] Add `MedicinesView.test.jsx` (**77% coverage**)
+    - [x] Add `SuppliersView.test.jsx` (**87% coverage**)
+    - [ ] Add `DispensingView.test.jsx` (Largest view)
+    - [ ] Target: Reach > 50% Overall Frontend Coverage (Current: 25.0%)
+- [ ] Backend Coverage Optimization (Phase 5) [ ]
+    - [ ] Add edge cases to `test_stock.py`
+    - [ ] Add concurrency tests to `test_dispensing.py`
+- [ ] E2E Reliability (Phase 6) [ ]
+    - [ ] Stabilize Playwright suite

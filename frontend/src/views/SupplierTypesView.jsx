@@ -11,7 +11,7 @@ const SupplierTypesView = ({
   const [editValue, setEditValue] = useState('');
   const [error, setError] = useState('');
 
-  const filteredTypes = types.filter(t => 
+  const filteredTypes = (types || []).filter(t => 
     (t.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 

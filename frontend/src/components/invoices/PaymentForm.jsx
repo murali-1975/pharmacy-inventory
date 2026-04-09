@@ -91,10 +91,11 @@ const PaymentForm = ({ invoice, currentUser, onClose, onSave }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Mode</label>
+                <label htmlFor="payment-mode" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Mode</label>
                 <div className="relative">
                   <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <select
+                    id="payment-mode"
                     required
                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold appearance-none cursor-pointer"
                     value={formData.payment_mode}
@@ -108,10 +109,11 @@ const PaymentForm = ({ invoice, currentUser, onClose, onSave }) => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Date</label>
+                <label htmlFor="payment-date" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Date</label>
                 <div className="relative">
                   <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <input
+                    id="payment-date"
                     type="date"
                     required
                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold"
@@ -123,10 +125,11 @@ const PaymentForm = ({ invoice, currentUser, onClose, onSave }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Paid Amount (₹) - Balance: ₹{balance.toLocaleString()}</label>
+              <label htmlFor="payment-amount" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Paid Amount (₹) - Balance: ₹{balance.toLocaleString()}</label>
               <div className="relative">
                 <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
+                  id="payment-amount"
                   type="number"
                   step="0.01"
                   required
@@ -139,10 +142,11 @@ const PaymentForm = ({ invoice, currentUser, onClose, onSave }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Reference</label>
+              <label htmlFor="payment-reference" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Payment Reference</label>
               <div className="relative">
                 <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
+                  id="payment-reference"
                   type="text"
                   placeholder="Txn ID, Chq No, etc."
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold"
@@ -153,10 +157,11 @@ const PaymentForm = ({ invoice, currentUser, onClose, onSave }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Remarks</label>
+              <label htmlFor="payment-remarks" className="text-[11px] font-black uppercase tracking-widest text-gray-400 ml-1">Remarks</label>
               <div className="relative">
                 <MessageSquare className="absolute left-4 top-3 text-gray-400" size={18} />
                 <textarea
+                  id="payment-remarks"
                   rows="2"
                   placeholder="Optional notes..."
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold"

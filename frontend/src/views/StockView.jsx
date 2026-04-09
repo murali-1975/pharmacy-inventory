@@ -828,8 +828,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
             </div>
           )}
           <form onSubmit={handleInitSubmit} style={{ ...styles.form, marginTop: "16px" }}>
-            <label style={styles.label}>Medicine</label>
+            <label htmlFor="init_medicine_id" style={styles.label}>Medicine</label>
             <select
+              id="init_medicine_id"
               value={initForm.medicine_id}
               onChange={(e) => { setInitForm({ ...initForm, medicine_id: e.target.value }); setHandle409(false); setError(""); }}
               style={styles.select}
@@ -846,8 +847,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
               ))}
             </select>
 
-            <label style={styles.label}>Opening Quantity</label>
+            <label htmlFor="init_quantity" style={styles.label}>Opening Quantity</label>
             <input
+              id="init_quantity"
               type="number"
               min="0"
               placeholder="e.g. 500"
@@ -893,8 +895,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
             Use a positive quantity to add stock, or a negative value to write off / correct downward.
           </p>
           <form onSubmit={handleAdjustSubmit} style={styles.form}>
-            <label style={styles.label}>Medicine</label>
+            <label htmlFor="adjust_medicine_id" style={styles.label}>Medicine</label>
             <select
+              id="adjust_medicine_id"
               value={adjustForm.medicine_id}
               onChange={(e) => setAdjustForm({ ...adjustForm, medicine_id: e.target.value })}
               style={styles.select}
@@ -911,8 +914,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
               ))}
             </select>
 
-            <label style={styles.label}>Quantity Change</label>
+            <label htmlFor="adjust_quantity_change" style={styles.label}>Quantity Change</label>
             <input
+              id="adjust_quantity_change"
               type="number"
               placeholder="e.g. +10 or -5"
               value={adjustForm.quantity_change}
@@ -931,8 +935,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
               <option value="WRITE_OFF">Write-Off</option>
             </select>
 
-            <label style={styles.label}>Reason</label>
+            <label htmlFor="adjust_reason" style={styles.label}>Reason</label>
             <textarea
+              id="adjust_reason"
               placeholder="e.g. Physical count — found 10 extra units on shelf C3"
               value={adjustForm.reason}
               onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}

@@ -18,10 +18,11 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <label className="text-sm font-bold text-gray-700">Manufacturer Name</label>
+        <label htmlFor="manufacturer-name" className="text-sm font-bold text-gray-700">Manufacturer Name</label>
         <div className="relative group">
           <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
           <input 
+            id="manufacturer-name"
             required
             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
             value={formData.name}
@@ -32,10 +33,11 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold text-gray-700">Address</label>
+        <label htmlFor="manufacturer-address" className="text-sm font-bold text-gray-700">Address</label>
         <div className="relative group">
           <MapPin className="absolute left-4 top-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
           <textarea 
+            id="manufacturer-address"
             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all min-h-[100px]"
             value={formData.address || ''}
             onChange={(e) => setFormData({...formData, address: e.target.value})}
@@ -46,10 +48,11 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Contact Person</label>
+          <label htmlFor="contact-person" className="text-sm font-bold text-gray-700">Contact Person</label>
           <div className="relative group">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="contact-person"
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={formData.contact_person || ''}
               onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
@@ -58,10 +61,11 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Phone Number</label>
+          <label htmlFor="manufacturer-phone" className="text-sm font-bold text-gray-700">Phone Number</label>
           <div className="relative group">
             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="manufacturer-phone"
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={formData.phone_number || ''}
               onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
@@ -71,10 +75,11 @@ const ManufacturerForm = ({ initialData, onSave, onCancel }) => {
         </div>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-bold text-gray-700">Contact Email</label>
+        <label htmlFor="contact-email" className="text-sm font-bold text-gray-700">Contact Email</label>
         <div className="relative group">
           <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
           <input 
+            id="contact-email"
             type="email"
             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
             value={formData.contact_email || ''}

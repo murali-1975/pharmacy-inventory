@@ -52,10 +52,11 @@ const SupplierForm = ({
       {/* Basic Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">Supplier Name</label>
+          <label htmlFor="supplier_name" className="text-sm font-bold text-gray-700">Supplier Name</label>
           <div className="relative group">
             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
             <input 
+              id="supplier_name"
               required
               className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={formData.supplier_name}
@@ -65,8 +66,9 @@ const SupplierForm = ({
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold text-gray-700">GST Number</label>
+          <label htmlFor="gstn" className="text-sm font-bold text-gray-700">GST Number</label>
           <input 
+            id="gstn"
             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
             value={formData.contact_details?.gstn || ''}
             onChange={(e) => updateContact('gstn', e.target.value)}
@@ -173,10 +175,11 @@ const SupplierForm = ({
       {/* Status & Bank Toggle */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">Status</label>
+            <label htmlFor="status_id" className="text-sm font-bold text-gray-700">Status</label>
             <div className="relative group">
                 <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <select 
+                id="status_id"
                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3.5 focus:border-blue-500 outline-none transition-all appearance-none"
                 value={formData.status_id}
                 onChange={(e) => setFormData({...formData, status_id: parseInt(e.target.value)})}
