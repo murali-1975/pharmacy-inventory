@@ -859,11 +859,12 @@ export default function StockView({ medicinesList = [], token, userRole }) {
               required
             />
 
-            <label style={styles.label}>Initialization Date</label>
+            <label htmlFor="init_date" style={styles.label}>Initialization Date</label>
             <p style={{ ...styles.hint, marginBottom: "4px" }}>
               Set this to the date the physical stock count was taken — can be historical.
             </p>
             <input
+              id="init_date"
               type="date"
               value={initForm.initialized_date}
               onChange={(e) => setInitForm({ ...initForm, initialized_date: e.target.value })}
@@ -871,8 +872,9 @@ export default function StockView({ medicinesList = [], token, userRole }) {
               required
             />
 
-            <label style={styles.label}>Notes (Optional)</label>
+            <label htmlFor="init_notes" style={styles.label}>Notes (Optional)</label>
             <textarea
+              id="init_notes"
               placeholder="e.g. Opening balance from Jan 2024 physical count — Shelf B2"
               value={initForm.notes}
               onChange={(e) => setInitForm({ ...initForm, notes: e.target.value })}

@@ -150,12 +150,14 @@ const SupplierTypesView = ({
                     <button 
                       onClick={() => handleEditStart(type)}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      aria-label="edit-type"
                     >
                       <Edit2 size={16} />
                     </button>
                     <button 
                       onClick={() => onDelete(type.id)}
                       className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label="delete-type"
                     >
                       <Trash2 size={16} />
                     </button>

@@ -22,5 +22,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/tests/setup.js',
     include: ['src/tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'json-summary'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'node_modules/',
+        'src/tests/',
+      ],
+    },
   },
 })
