@@ -67,7 +67,12 @@ describe('App Component', () => {
     api.getSupplierTypes.mockResolvedValue([]);
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({})
+      json: async () => ({
+        total_medicines: 10,
+        pending_invoices_amount: 5000,
+        monthly_procurement: 1200,
+        low_stock_alerts: 2
+      })
     });
   });
 
@@ -79,7 +84,9 @@ describe('App Component', () => {
     );
     // Should show Omniflow (Login screen since no token)
     await waitFor(() => {
-      expect(screen.getByText(/Omniflow/i)).toBeInTheDocument();
+      // Use getAllByText and pick the first one (heading) to avoid ambiguity with footer
+      expect(screen.getAllByText(/Omniflow/i)[0]).toBeInTheDocument();
+      expect(screen.getByText(/Welcome back/i)).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 

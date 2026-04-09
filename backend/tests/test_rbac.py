@@ -26,8 +26,6 @@ def test_admin_can_access_users(clean_overrides):
     with TestClient(app) as client:
         response = client.get("/users/")
         # Status code should be 200 or 404 (if db empty but authorized)
-        # But here RoleChecker should pass, then maybe DB session fails or returns empty
-        # We just care it doesn't return 403
         assert response.status_code != 403
 
 def test_staff_cannot_access_users(clean_overrides):

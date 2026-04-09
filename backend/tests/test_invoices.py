@@ -9,10 +9,8 @@ from app import models
 # Note: conftest.py already provides the overrides for get_db and get_current_user
 
 def test_create_invoice(client, db):
-    # 0. Seed lookups
-    db.add(models.SupplierType(id=1, name="Standard"))
-    db.add(models.Status(id=1, name="Active"))
-    db.commit()
+    # 0. Seed lookups - Handled by conftest.py db fixture
+    pass
 
     # 1. Create a supplier first
     supplier_res = client.post("/suppliers/", json={"supplier_name": "Test Supplier", "type_id": 1, "status_id": 1})
@@ -20,7 +18,7 @@ def test_create_invoice(client, db):
     supplier_id = supplier_res.json()["id"]
 
     # 2. Get a medicine (seeded earlier or via API)
-    med_res = client.post("/medicines/", json={"name": "Test Med", "description": "Test Desc"})
+    med_res = client.post("/medicines/", json={"product_name": "Test Med", "description": "Test Desc"})
     assert med_res.status_code == 200
     med_id = med_res.json()["id"]
 
@@ -51,7 +49,9 @@ def test_create_invoice(client, db):
 def test_list_invoices(client):
     res = client.get("/invoices/")
     assert res.status_code == 200
-    assert isinstance(res.json(), list)
+    data = res.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
 
 def test_get_invoice(client):
     # Assuming at least one invoice exists from previous test (if using same DB)
@@ -60,11 +60,8 @@ def test_get_invoice(client):
         assert "reference_number" in res.json()
 
 def test_delete_invoice(client, db):
-    # 0. Seed lookups (using different IDs to avoid conflicts or just handle it)
-    # Since each test gets a fresh DB due to conftest.py's function scope, we can use same IDs
-    db.add(models.SupplierType(id=1, name="Standard"))
-    db.add(models.Status(id=1, name="Active"))
-    db.commit()
+    # 0. Seed lookups - Handled by conftest.py db fixture
+    pass
 
     # Create one to delete
     supplier_res = client.post("/suppliers/", json={"supplier_name": "Delete Supplier", "type_id": 1, "status_id": 1})
@@ -87,11 +84,8 @@ def test_delete_invoice(client, db):
     assert get_res.status_code == 404
 
 def test_create_non_pharmacy_invoice(client, db):
-    # 0. Seed lookups
-    # Supplier Type 3: Printer (Non-Pharmacy)
-    db.add(models.SupplierType(id=3, name="Printer"))
-    db.add(models.Status(id=1, name="Active"))
-    db.commit()
+    # 0. Seed lookups - Handled by conftest.py db fixture
+    pass
 
     # 1. Create a printer supplier
     supplier_res = client.post("/suppliers/", json={"supplier_name": "Printer Corp", "type_id": 3, "status_id": 1})

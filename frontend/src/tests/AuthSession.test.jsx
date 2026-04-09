@@ -69,7 +69,12 @@ describe('Session Timeout Handling', () => {
     // Mock global fetch for analytics endpoints or other direct calls
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({})
+      json: async () => ({
+        total_medicines: 10,
+        pending_invoices_amount: 5000,
+        monthly_procurement: 1200,
+        low_stock_alerts: 2
+      })
     });
   });
 
@@ -116,7 +121,8 @@ describe('Session Timeout Handling', () => {
 
     // Should show the App Header/Sidebar (Omniflow is at the top)
     await waitFor(() => {
-      const brand = screen.queryByText(/Omniflow/i);
+      // Use getAllByText to avoid ambiguity with footer
+      const brand = screen.getAllByText(/Omniflow/i)[0];
       expect(brand).toBeInTheDocument();
     }, { timeout: 3000 });
   });
