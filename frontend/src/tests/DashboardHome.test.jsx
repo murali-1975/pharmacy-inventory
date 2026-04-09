@@ -5,8 +5,8 @@ import DashboardHome from '../views/DashboardHome.jsx';
 
 describe('DashboardHome Component', () => {
   const mockInvoices = [
-    { id: 1, reference_number: 'INV-001', invoice_date: '2024-03-20', total_value: 1000 },
-    { id: 2, reference_number: 'INV-002', invoice_date: '2024-03-21', total_value: 2000 }
+    { id: 1, reference_number: 'INV-001', invoice_date: '2024-03-20', total_value: 1000, supplier: { supplier_name: 'Alpha Pharma' } },
+    { id: 2, reference_number: 'INV-002', invoice_date: '2024-03-21', total_value: 2000, supplier: { supplier_name: 'Beta Meds' } }
   ];
 
   const mockStats = {
@@ -45,6 +45,7 @@ describe('DashboardHome Component', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
 
     expect(screen.getByText('INV-001')).toBeInTheDocument();
+    expect(screen.getByText('Alpha Pharma')).toBeInTheDocument();
     expect(screen.getByText('20-03-2024')).toBeInTheDocument();
     expect(screen.getByText('₹1,000')).toBeInTheDocument();
   });

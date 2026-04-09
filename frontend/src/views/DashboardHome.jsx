@@ -103,7 +103,11 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{inv.reference_number}</p>
-                  <p className="text-xs text-gray-500">{formatDate(inv.invoice_date)}</p>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <span className="font-medium text-blue-600">{inv.supplier?.supplier_name || 'Unknown Supplier'}</span>
+                    <span>•</span>
+                    <span>{formatDate(inv.invoice_date)}</span>
+                  </div>
                 </div>
               </div>
               <p className="font-bold text-gray-900">₹{inv.total_value.toLocaleString()}</p>
