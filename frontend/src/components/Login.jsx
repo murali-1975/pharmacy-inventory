@@ -84,10 +84,11 @@ const Login = ({ onLogin, error: propError, logoutReason }) => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
+              <label htmlFor="login-username" className="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
               <div className="relative group">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 
+                  id="login-username"
                   required
                   type="text"
                   placeholder="admin"
@@ -100,10 +101,11 @@ const Login = ({ onLogin, error: propError, logoutReason }) => {
 
             {isRegistering && (
               <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Email Address</label>
+                <label htmlFor="login-email" className="text-xs font-bold text-gray-500 uppercase ml-1">Email Address</label>
                 <div className="relative group">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                   <input 
+                    id="login-email"
                     required
                     type="email"
                     placeholder="admin@pharma.com"
@@ -116,10 +118,11 @@ const Login = ({ onLogin, error: propError, logoutReason }) => {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
+              <label htmlFor="login-password" className="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 
+                  id="login-password"
                   required
                   type="password"
                   placeholder="••••••••"

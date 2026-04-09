@@ -52,7 +52,7 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
       <StatCard 
         icon={Package} 
         label="Total Medicines" 
-        value={stats.total_medicines.toString()} 
+        value={(stats?.total_medicines ?? 0).toString()} 
         trend={12} 
         color="bg-blue-500" 
         subValue="in stock" 
@@ -60,7 +60,7 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
       <StatCard 
         icon={CreditCard} 
         label="Pending Payments" 
-        value={`₹${stats.pending_invoices_amount.toLocaleString()}`} 
+        value={`₹${(stats?.pending_invoices_amount ?? 0).toLocaleString()}`} 
         trend={0} 
         color="bg-indigo-500" 
         subValue="to be paid" 
@@ -68,14 +68,14 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
       <StatCard 
         icon={TrendingUp} 
         label="Monthly Procurement" 
-        value={`₹${stats.monthly_procurement.toLocaleString()}`} 
+        value={`₹${(stats?.monthly_procurement ?? 0).toLocaleString()}`} 
         trend={8.2} 
         color="bg-green-500" 
       />
       <StatCard 
         icon={AlertCircle} 
         label="Low Stock Alert" 
-        value={stats.low_stock_alerts.toString()} 
+        value={(stats?.low_stock_alerts ?? 0).toString()} 
         trend={-2} 
         color="bg-orange-500" 
       />

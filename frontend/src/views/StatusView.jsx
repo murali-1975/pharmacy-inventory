@@ -11,7 +11,7 @@ const StatusView = ({
   const [editValue, setEditValue] = useState('');
   const [error, setError] = useState('');
 
-  const filteredStatuses = statuses.filter(s => 
+  const filteredStatuses = (statuses || []).filter(s => 
     (s.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -24,11 +24,12 @@ const StatusView = ({
   const handleSave = (id) => {
     if (!editValue.trim()) {
         setError('Please enter a status name');
+        if (id === null) setIsEditing('new');
         return;
     }
     
     // Check duplicates
-    if (statuses.some(s => s.name.toLowerCase() === editValue.trim().toLowerCase() && s.id !== id)) {
+    if ((statuses || []).some(s => (s.name || '').toLowerCase() === editValue.trim().toLowerCase() && s.id !== id)) {
         setError('This status already exists');
         return;
     }

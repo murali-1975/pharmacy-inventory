@@ -10,7 +10,7 @@ const Header = ({
   return (
     <header className="h-24 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-10 z-20 sticky top-0">
       <div className="flex items-center space-x-6">
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors shadow-sm bg-white border border-gray-100">
+        <button aria-label="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 transition-colors shadow-sm bg-white border border-gray-100">
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="h-8 w-px bg-gray-100"></div>
