@@ -9,12 +9,14 @@ Initializes the FastAPI application with:
 """
 from contextlib import asynccontextmanager
 import os
-from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request, status, Depends
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
-from . import models, database
+from typing import List
+from . import models, database, schemas
 from .routers import auth, suppliers, lookups, users, invoices, medicines, manufacturers, stock, dispensing, analytics, financials
 from .core.config import settings
 from .core.logging_config import LoggingMiddleware, logger
@@ -111,3 +113,10 @@ def health_check():
     The database connectivity check is handled at startup via seeding.
     """
     return {"status": "healthy", "service": settings.APP_NAME}
+
+@app.get("/status", response_model=List[schemas.StatusSchema], tags=["Health"])
+def get_statuses(db: Session = Depends(database.get_db)):
+    """
+    Returns all statuses. Used by legacy tests and health checks.
+    """
+    return db.query(models.Status).all()
