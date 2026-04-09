@@ -1,7 +1,0 @@
-- [x] Backend: Update `MedicineSchema` to include `quantity_on_hand`
-- [x] Backend: Update `/api/medicines/` endpoint to return stock levels
-- [x] Frontend: Update `MedicineSearchSelect` results filtering (hide zero stock)
-- [x] Frontend: Update `MedicineSearchSelect` display (show stock count in braces)
-- [x] Frontend: Increase vertical height of dispensing table and search dropdown
-- [x] Verification: Update `DispensingView.test.jsx` and run tests
-- [x] Verification: Manual confirmation in browser
