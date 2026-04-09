@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import PaymentForm from '../components/invoices/PaymentForm';
 import BulkUploadModal from '../components/invoices/BulkUploadModal';
+import { formatDate } from '../utils/dateUtils';
 
 const InvoicesView = ({ 
   invoices, 
@@ -122,7 +123,7 @@ const InvoicesView = ({
                     </div>
                   </td>
                   <td className="px-6 py-5 text-sm text-gray-600 font-medium">
-                    {new Date(invoice.invoice_date).toLocaleDateString()}
+                    {formatDate(invoice.invoice_date)}
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center text-sm text-gray-900 font-bold">

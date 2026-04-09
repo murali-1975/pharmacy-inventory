@@ -54,6 +54,8 @@ describe('StockView Component', () => {
     
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
+      // '2024-03-20T10:00:00Z' formats to 03:30 PM in IST (+5:30)
+      expect(screen.getByText(/20-03-2024.*03:30 PM/i)).toBeInTheDocument();
     });
   });
 
@@ -238,6 +240,8 @@ describe('StockView Component', () => {
 
     // Details panel should appear
     expect(await screen.findByRole('heading', { name: /Adjustment History/i })).toBeInTheDocument();
+    // '2024-03-21T00:00:00Z' formats to 05:30 AM in IST (+5:30)
+    expect(screen.getByText(/21-03-2024.*05:30 AM/i)).toBeInTheDocument();
     expect(screen.getByText('+10')).toBeInTheDocument();
   });
 

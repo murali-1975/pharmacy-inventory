@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, CreditCard, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { StatCard } from '../components/common/Common';
+import { formatDate } from '../utils/dateUtils';
 
 const DashboardHome = ({ setView, invoices = [], token }) => {
   const [stats, setStats] = useState({
@@ -102,7 +103,7 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{inv.reference_number}</p>
-                  <p className="text-xs text-gray-500">{new Date(inv.invoice_date).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-500">{formatDate(inv.invoice_date)}</p>
                 </div>
               </div>
               <p className="font-bold text-gray-900">₹{inv.total_value.toLocaleString()}</p>

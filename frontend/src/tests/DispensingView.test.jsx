@@ -17,13 +17,15 @@ describe('DispensingView', () => {
       id: 1, 
       product_name: 'Paracetamol', 
       generic_name: 'Acetaminophen', 
-      selling_price_percent: 10 
+      selling_price_percent: 10,
+      quantity_on_hand: 50
     },
     { 
       id: 2, 
       product_name: 'Amoxicillin', 
       generic_name: 'Penicillin', 
-      selling_price_percent: 5 
+      selling_price_percent: 5,
+      quantity_on_hand: 0
     }
   ];
 
@@ -67,6 +69,20 @@ describe('DispensingView', () => {
     expect(screen.getAllByPlaceholderText(/Search medicine\.\.\./i)).toHaveLength(2);
   });
 
+  it('filters out zero-stock medicines and shows stock count in results', async () => {
+    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
+    fireEvent.focus(searchInput);
+    fireEvent.change(searchInput, { target: { value: 'a' } }); // Search for 'a' to match both nominally
+    
+    // Paracetamol (50) should be there
+    expect(await screen.findByText('Paracetamol (50)')).toBeInTheDocument();
+    
+    // Amoxicillin (0 stock) should NOT be there
+    expect(screen.queryByText(/Amoxicillin/i)).not.toBeInTheDocument();
+  });
+
   it('validates patient name before saving', async () => {
     render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
     
@@ -99,7 +115,7 @@ describe('DispensingView', () => {
     fireEvent.focus(searchInput);
     fireEvent.change(searchInput, { target: { value: 'Paracetamol' } });
     
-    const option = await screen.findByText('Paracetamol');
+    const option = await screen.findByText('Paracetamol (50)');
     fireEvent.mouseDown(option);
 
     // Wait for auto-fill logic (it calls fetch)
@@ -140,7 +156,7 @@ describe('DispensingView', () => {
     const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
     fireEvent.focus(searchInput);
     fireEvent.change(searchInput, { target: { value: 'Paracetamol' } });
-    const option = await screen.findByText('Paracetamol');
+    const option = await screen.findByText('Paracetamol (50)');
     fireEvent.mouseDown(option);
 
     // Wait for auto-fill price
@@ -186,6 +202,7 @@ describe('DispensingView', () => {
     
     expect(await screen.findByText('Alice')).toBeInTheDocument();
     const table = document.getElementById('dispensing-history-table');
+    expect(within(table).getByText('01-04-2024')).toBeInTheDocument();
     expect(within(table).getByText('Paracetamol')).toBeInTheDocument();
   });
 
@@ -219,7 +236,7 @@ describe('DispensingView', () => {
     const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
     fireEvent.focus(searchInput);
     fireEvent.change(searchInput, { target: { value: 'Paracetamol' } });
-    const option = await screen.findByText('Paracetamol');
+    const option = await screen.findByText('Paracetamol (50)');
     fireEvent.mouseDown(option);
 
     // Fill quantity
@@ -306,6 +323,7 @@ describe('DispensingView', () => {
 
     // Preview should show
     expect(await screen.findByText(/📊 Preview/i)).toBeInTheDocument();
+    expect(screen.getByText('01-04-2024')).toBeInTheDocument();
     expect(screen.getByText(/UnknownMed/i)).toBeInTheDocument();
     expect(screen.getByText(/Fix Mapping/i)).toBeInTheDocument();
 

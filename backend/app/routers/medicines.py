@@ -4,7 +4,7 @@ Handles CRUD operations for medicine master data, brand names, and drug details.
 Access: All authenticated users (Read), Admin/Manager (Write/Delete).
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
 from app import models, database, auth, schemas, utils
@@ -25,7 +25,10 @@ def list_medicines(skip: int = 0, limit: int = 100, db: Session = Depends(databa
     Returns: List[schemas.MedicineSchema]
     """
     with utils.db_error_handler("medicines retrieval"):
-        return db.query(models.Medicine).offset(skip).limit(limit).all()
+        medicines = db.query(models.Medicine).options(joinedload(models.Medicine.stock)).offset(skip).limit(limit).all()
+        for medicine in medicines:
+            medicine.quantity_on_hand = medicine.stock.quantity_on_hand if medicine.stock else 0
+        return medicines
 
 @router.post("/", response_model=schemas.MedicineSchema)
 def create_medicine(

@@ -222,6 +222,7 @@ class MedicineSchema(MedicineBase):
     """Response schema for medicine master data."""
     id: int
     is_active: bool
+    quantity_on_hand: int = 0
     manufacturer: Optional[ManufacturerSchema] = None
     batches: List[StockBatchSchema] = []
     class Config:

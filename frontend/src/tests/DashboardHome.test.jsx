@@ -45,6 +45,7 @@ describe('DashboardHome Component', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
 
     expect(screen.getByText('INV-001')).toBeInTheDocument();
+    expect(screen.getByText('20-03-2024')).toBeInTheDocument();
     expect(screen.getByText('₹1,000')).toBeInTheDocument();
   });
 

@@ -1,28 +1,7 @@
-- [x] Add `GET /status` to `backend/app/main.py`
-- [x] Update `backend/tests/conftest.py` with StaticPool and Seed
-- [x] Run initial backend tests and verify stability
-- [x] Backend Test Suite Synchronization (Phase 2) 
-    - [x] Import 110 tests from backup
-    - [x] Resolve seeding and import regressions
-    - [x] **Verification**: 110/110 passed, 79% coverage.
-- [x] Frontend Test Infrastructure (Phase 3)
-    - [x] Create `TestWrapper.jsx` helper
-    - [x] Implement `DashboardHome.jsx` defensive rendering (Fixed Crashes)
-    - [x] Install `react-router-dom` dependency
-    - [x] Fixed ambiguous selectors in `App.test.jsx` & `AuthSession.test.jsx`
-- [x] Frontend Coverage Expansion (Phase 4) [x]
-    - [x] Add `InvoicesView.test.jsx` (**60% coverage**)
-    - [x] Add `StockView.test.jsx` (**43% coverage**)
-    - [x] Add `MedicinesView.test.jsx` (**77% coverage**)
-    - [x] Add `SuppliersView.test.jsx` (**87% coverage**)
-    - [x] Add `DispensingView.test.jsx` (Largest view)
-    - [x] Fix `DispensingView.test.jsx` (FileReader & scrollIntoView errors)
-    - [x] Fix `FinancialsView.test.jsx` (act warnings)
-    - [x] Expand `UsersView.test.jsx`
-    - [x] Expand `ManufacturersView.test.jsx`
-    - [x] **Verification**: Overall Frontend View Coverage reached **71%** (Target was >60%)
-- [ ] Backend Coverage Optimization (Phase 5) [ ]
-    - [ ] Add edge cases to `test_stock.py`
-    - [ ] Add concurrency tests to `test_dispensing.py`
-- [ ] E2E Reliability (Phase 6) [ ]
-    - [ ] Stabilize Playwright suite
+- [x] Backend: Update `MedicineSchema` to include `quantity_on_hand`
+- [x] Backend: Update `/api/medicines/` endpoint to return stock levels
+- [x] Frontend: Update `MedicineSearchSelect` results filtering (hide zero stock)
+- [x] Frontend: Update `MedicineSearchSelect` display (show stock count in braces)
+- [x] Frontend: Increase vertical height of dispensing table and search dropdown
+- [x] Verification: Update `DispensingView.test.jsx` and run tests
+- [x] Verification: Manual confirmation in browser

@@ -53,6 +53,7 @@ describe('InvoicesView Component', () => {
     );
 
     expect(screen.getByText('INV-001')).toBeInTheDocument();
+    expect(screen.getByText('20-03-2024')).toBeInTheDocument();
     expect(screen.getByText('INV-002')).toBeInTheDocument();
     expect(screen.getByText('Pharma Corp')).toBeInTheDocument();
     // Use getAllByText for currency since it may appear in multiple columns

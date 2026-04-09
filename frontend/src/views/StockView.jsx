@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatDate, formatDateTime } from "../utils/dateUtils";
 
 const API_BASE = "/api";
 
@@ -80,21 +81,6 @@ async function postInitialize(token, payload, force = false) {
 // Sub-components
 // -----------------------------------------------------------------------
 
-/** Format date to dd-mm-yy hh:mm A */
-const formatDate = (dateString) => {
-  if (!dateString) return "—";
-  const date = new Date(dateString);
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12;
-  hours = hours ? hours : 12; // 0 becomes 12
-  const hh = String(hours).padStart(2, "0");
-  return `${dd}-${mm}-${yyyy} ${hh}:${minutes} ${ampm}`;
-};
 
 /** Badge showing Normal / Low / Out of Stock */
 function StockBadge({ qty, reorderLevel }) {
@@ -515,7 +501,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
                           <StockBadge qty={item.quantity_on_hand} reorderLevel={item.reorder_level || 0} />
                         </td>
                         <td style={styles.td}>
-                          {item.last_updated_at ? formatDate(item.last_updated_at) : "—"}
+                          {item.last_updated_at ? formatDateTime(item.last_updated_at) : "—"}
                         </td>
                       </tr>
                     ))}
@@ -736,7 +722,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
                               <tr key={batch.id} style={styles.row}>
                                 <td style={styles.td}><strong>{batch.batch_no}</strong></td>
                                 <td style={{ ...styles.td, color: isExpired ? "#C53030" : isNearExpiry ? "#B7791F" : "#2D3748", fontWeight: (isExpired || isNearExpiry) ? 700 : 400 }}>
-                                  {batch.expiry_date}
+                                  {formatDate(batch.expiry_date)}
                                   {isExpired && " (EXPIRED)"}
                                   {!isExpired && isNearExpiry && " (Near Expiry)"}
                                 </td>
@@ -782,7 +768,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
                     <tbody>
                       {history.map((adj) => (
                         <tr key={adj.id} style={styles.row}>
-                          <td style={styles.td}>{formatDate(adj.adjusted_at)}</td>
+                          <td style={styles.td}>{formatDateTime(adj.adjusted_at)}</td>
                           <td style={styles.td}><TypeBadge type={adj.adjustment_type} /></td>
                           <td style={{ ...styles.td, ...(adj.quantity_change >= 0 ? styles.changePositive : styles.changeNegative) }}>
                             {adj.quantity_change > 0 ? "+" : ""}{adj.quantity_change}

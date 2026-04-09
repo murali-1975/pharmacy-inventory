@@ -22,6 +22,7 @@ import {
   Upload, Download, AlertCircle, CheckCircle, Search, 
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight 
 } from "lucide-react";
+import { formatDate } from "../utils/dateUtils";
 
 const API_BASE = "/api";
 const authHeaders = (token) => ({
@@ -65,12 +66,13 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
   // Find the selected medicine name for display when not searching
   const selectedMed = medicines.find(m => String(m.id) === String(value));
   const displayName = selectedMed 
-    ? `${selectedMed.product_name}${selectedMed.generic_name ? ` (${selectedMed.generic_name})` : ""}`
+    ? `${selectedMed.product_name} (${selectedMed.quantity_on_hand})${selectedMed.generic_name ? ` (${selectedMed.generic_name})` : ""}`
     : "";
 
   const filtered = medicines.filter(m => 
-    m.product_name.toLowerCase().includes(search.toLowerCase()) ||
-    m.generic_name?.toLowerCase().includes(search.toLowerCase())
+    (m.product_name.toLowerCase().includes(search.toLowerCase()) ||
+     m.generic_name?.toLowerCase().includes(search.toLowerCase())) &&
+    m.quantity_on_hand > 0
   ).slice(0, 50); // Performance cap
 
   return (
@@ -98,7 +100,7 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
                   setIsOpen(false);
                 }}
               >
-                <div style={s.resName}>{m.product_name}</div>
+                <div style={s.resName}>{m.product_name} ({m.quantity_on_hand})</div>
                 <div style={s.resGeneric}>{m.generic_name}</div>
               </div>
             ))
@@ -741,7 +743,7 @@ export default function DispensingView({ medicines = [], token, userRole }) {
                     <tbody>
                       {bulkData.map((row, idx) => (
                         <tr key={idx} style={s.row}>
-                          <td style={s.td}>{row.date}</td>
+                          <td style={s.td}>{formatDate(row.date)}</td>
                           <td style={s.td}>{row.patient_name}</td>
                           <td style={s.td}>
                             {row.medicine_id ? (
@@ -874,7 +876,7 @@ export default function DispensingView({ medicines = [], token, userRole }) {
                   <tbody>
                     {records.map((rec) => (
                       <tr key={rec.id} style={s.row}>
-                        <td style={s.td}>{rec.dispensed_date}</td>
+                        <td style={s.td}>{formatDate(rec.dispensed_date)}</td>
                         <td style={s.td}><strong>{rec.patient_name}</strong></td>
                         <td style={s.td}>{rec.medicine?.product_name ?? `ID ${rec.medicine_id}`}</td>
                         <td style={s.td}>{rec.quantity}</td>
@@ -1005,7 +1007,7 @@ const s = {
   input:  { padding: "9px 13px", border: "1px solid #CBD5E0", borderRadius: "8px", fontSize: "14px", color: "#1a202c", outline: "none", boxSizing: "border-box" },
 
   /* Line-item table */
-  tableWrapper: { overflowX: "auto", borderRadius: "10px", border: "1px solid #E2E8F0", marginBottom: "0" },
+  tableWrapper: { overflowX: "auto", overflowY: "auto", maxHeight: "500px", borderRadius: "10px", border: "1px solid #E2E8F0", marginBottom: "0" },
   table:     { width: "100%", borderCollapse: "collapse", fontSize: "13px" },
   tableHead: { background: "#F7FAFC" },
   th: { padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#4A5568", borderBottom: "2px solid #E2E8F0", whiteSpace: "nowrap", fontSize: "12px" },
@@ -1063,7 +1065,7 @@ const s = {
     borderRadius: "8px",
     boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
     zIndex: 1000,
-    maxHeight: "300px",
+    maxHeight: "480px",
     overflowY: "auto",
     padding: "4px",
   },
