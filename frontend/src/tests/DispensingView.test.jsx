@@ -345,4 +345,39 @@ describe('DispensingView', () => {
     
     await waitFor(() => expect(mockOnRefresh).toHaveBeenCalled());
   });
+
+  it('handles successful record cancelation and refreshes medicines', async () => {
+    // Mock for record delete and list
+    globalThis.fetch.mockImplementation((url, options) => {
+      if (options?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, json: async () => ({ status: 'success' }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
+    });
+    
+    // Mock confirm
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
+    
+    fireEvent.click(screen.getByText(/Dispensing History/i));
+    
+    // Wait for records to load (empty in this case but we need the table)
+    const mockHistory = {
+      items: [{ id: 50, dispensed_date: '2024-04-10', patient_name: 'Test', medicine: { product_name: 'Paracetamol' }, quantity: 1, total_amount: 10, status: 'Active' }],
+      total: 1
+    };
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => mockHistory });
+    
+    // Trigger history load manually by clicking search (since we need to reload it with data)
+    fireEvent.click(screen.getByText('🔍 Search'));
+
+    const cancelBtn = await screen.findByText(/Cancel/i);
+    fireEvent.click(cancelBtn);
+
+    await waitFor(() => {
+      expect(mockOnRefresh).toHaveBeenCalled();
+      expect(screen.getByText(/Dispensing record cancelled/i)).toBeInTheDocument();
+    });
+  });
 });

@@ -471,6 +471,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
     try {
       await deleteDispensing(token, id);
       setSuccess("Dispensing record cancelled and stock restored.");
+      onRefreshMedicines();
       loadRecords(filterApplied);
     } catch (e) {
       setError(e.message);

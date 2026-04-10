@@ -217,7 +217,10 @@ const App = () => {
               invoices={invoices}
               onAddClick={() => { setEditingItem(null); setModalType('invoice'); setIsModalOpen(true); }}
               onEditClick={(inv) => { setEditingItem(inv); setModalType('invoice'); setIsModalOpen(true); }}
-              onDeleteClick={onDeleteInvoice}
+              onDeleteClick={async (id) => {
+                await onDeleteInvoice(id);
+                fetchMedicines();
+              }}
               loading={invLoading}
               currentUser={currentUser}
               currentPage={currentPage}
@@ -295,7 +298,11 @@ const App = () => {
           <InvoiceForm 
             onSave={async (data) => {
               const success = await onSaveInvoice(data, editingItem?.id);
-              if (success) { setIsModalOpen(false); setEditingItem(null); }
+              if (success) { 
+                fetchMedicines();
+                setIsModalOpen(false); 
+                setEditingItem(null); 
+              }
             }}
             initialData={editingItem}
             suppliers={suppliers}
