@@ -235,10 +235,10 @@ const App = () => {
             />
           )}
           {activeTab === 'dispensing' && (
-            <DispensingView medicines={medicines} token={token} userRole={currentUser?.role} />
+            <DispensingView medicines={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} />
           )}
           {activeTab === 'stock' && (
-            <StockView medicinesList={medicines} token={token} userRole={currentUser?.role} />
+            <StockView medicinesList={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} />
           )}
           {activeTab === 'financials' && currentUser?.role === 'Admin' && (
             <FinancialsView token={token} />

@@ -26,8 +26,10 @@ describe('StockView Component', () => {
     total: 1
   };
 
+  const mockOnRefresh = vi.fn();
   const defaultProps = {
     medicinesList: mockMedicines,
+    onRefreshMedicines: mockOnRefresh,
     token: 'test-token',
     userRole: 'Admin'
   };
@@ -181,6 +183,7 @@ describe('StockView Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Adjustment applied successfully/i)).toBeInTheDocument();
+      expect(mockOnRefresh).toHaveBeenCalled();
     });
   });
 
@@ -210,6 +213,7 @@ describe('StockView Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/initialized successfully/i)).toBeInTheDocument();
+      expect(mockOnRefresh).toHaveBeenCalled();
     });
   });
 
@@ -269,6 +273,7 @@ describe('StockView Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Adjustment applied successfully/i)).toBeInTheDocument();
+      expect(mockOnRefresh).toHaveBeenCalled();
     });
   });
 
@@ -307,6 +312,7 @@ describe('StockView Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/initialized successfully/i)).toBeInTheDocument();
+      expect(mockOnRefresh).toHaveBeenCalled();
     });
   });
 });

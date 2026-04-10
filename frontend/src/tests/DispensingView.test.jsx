@@ -31,6 +31,7 @@ describe('DispensingView', () => {
 
   const mockToken = 'test-token';
   const mockUserRole = 'Admin';
+  const mockOnRefresh = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,7 +51,7 @@ describe('DispensingView', () => {
   });
 
   it('renders correctly with initial empty row', () => {
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     expect(screen.getByRole('heading', { level: 2, name: /Medicine Dispensing/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Patient Name/i)).toBeInTheDocument();
     // Should have one initial row (searching for the plus icon or add medicine button)
@@ -58,7 +59,7 @@ describe('DispensingView', () => {
   });
 
   it('adds a new row when "+ Add Medicine" is clicked', async () => {
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     // Initially count inputs or rows. Let's use placeholders as a proxy.
     const initialInputs = screen.getAllByPlaceholderText(/Search medicine\.\.\./i);
@@ -70,7 +71,7 @@ describe('DispensingView', () => {
   });
 
   it('filters out zero-stock medicines and shows stock count in results', async () => {
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
     fireEvent.focus(searchInput);
@@ -84,7 +85,7 @@ describe('DispensingView', () => {
   });
 
   it('validates patient name before saving', async () => {
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     fireEvent.click(screen.getByText(/Save All/i));
     
@@ -109,7 +110,7 @@ describe('DispensingView', () => {
       return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
     });
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
     fireEvent.focus(searchInput);
@@ -147,7 +148,7 @@ describe('DispensingView', () => {
       return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
     });
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     // Fill patient name
     fireEvent.change(screen.getByLabelText(/Patient Name/i), { target: { value: 'John Doe' } });
@@ -170,6 +171,7 @@ describe('DispensingView', () => {
     fireEvent.click(screen.getByText(/Save All/i));
 
     expect(await screen.findByText(/All 1 dispensing entries saved/i)).toBeInTheDocument();
+    expect(mockOnRefresh).toHaveBeenCalled();
   });
 
   it('switches to history tab and loads records', async () => {
@@ -196,7 +198,7 @@ describe('DispensingView', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     fireEvent.click(screen.getByText(/Dispensing History/i));
     
@@ -207,7 +209,7 @@ describe('DispensingView', () => {
   });
 
   it('removes a row when the "✕" button is clicked', async () => {
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     // Add a second row
     fireEvent.click(screen.getByText(/\+ Add Medicine/i));
@@ -228,7 +230,7 @@ describe('DispensingView', () => {
       })
     );
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     fireEvent.change(screen.getByLabelText(/Patient Name/i), { target: { value: 'John Doe' } });
     
@@ -272,7 +274,7 @@ describe('DispensingView', () => {
       json: async () => mockLargeHistory
     });
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     fireEvent.click(screen.getByText(/Dispensing History/i));
     
@@ -308,7 +310,7 @@ describe('DispensingView', () => {
       }
     });
 
-    render(<DispensingView medicines={mockMedicines} token={mockToken} userRole={mockUserRole} />);
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
     
     fireEvent.click(screen.getByText(/Bulk Upload/i));
     
@@ -333,5 +335,14 @@ describe('DispensingView', () => {
 
     expect(screen.getByText(/Ready/i)).toBeInTheDocument();
     expect(screen.getByText(/Paracetamol/i)).toBeInTheDocument();
+
+    // Submit
+    globalThis.fetch.mockResolvedValueOnce({ 
+      ok: true, 
+      json: async () => ({ success_count: 1, failed_count: 0 }) 
+    });
+    fireEvent.click(screen.getByText(/Upload Records/i));
+    
+    await waitFor(() => expect(mockOnRefresh).toHaveBeenCalled());
   });
 });

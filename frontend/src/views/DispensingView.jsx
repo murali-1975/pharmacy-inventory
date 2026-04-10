@@ -124,7 +124,7 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
  * @param {string} props.token - JWT authentication token.
  * @param {string} props.userRole - Current user's role (Admin, Staff, etc.).
  */
-export default function DispensingView({ medicines = [], token, userRole }) {
+export default function DispensingView({ medicines = [], onRefreshMedicines = () => {}, token, userRole }) {
   const todayStr = new Date().toISOString().split("T")[0];
 
   // --- API Helpers (Internal) ---
@@ -256,7 +256,10 @@ export default function DispensingView({ medicines = [], token, userRole }) {
     try {
       const res = await uploadDispensing(token, bulkFile);
       setBulkSummary(res);
-      if (res.success_count > 0) loadRecords();
+      if (res.success_count > 0) {
+        onRefreshMedicines();
+        loadRecords();
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -450,6 +453,7 @@ export default function DispensingView({ medicines = [], token, userRole }) {
     const failed = rows.length - successCount;
     if (failed === 0) {
       setSuccess(`✅ All ${successCount} dispensing entries saved! Grand total: ₹${grandTotal(rows)}`);
+      onRefreshMedicines();
       setRows([emptyRow()]);
       setHeader({ dispensed_date: todayStr, patient_name: "" });
     } else {

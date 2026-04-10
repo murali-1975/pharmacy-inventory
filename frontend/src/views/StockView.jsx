@@ -152,7 +152,7 @@ function Spinner() {
  * @param {string} props.token - JWT authentication token.
  * @param {string} props.userRole - Current user's role.
  */
-export default function StockView({ medicinesList = [], token, userRole }) {
+export default function StockView({ medicinesList = [], onRefreshMedicines = () => {}, token, userRole }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [stockData, setStockData] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -359,6 +359,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
       });
       setSuccess("Stock adjustment applied successfully!");
       setAdjustForm({ medicine_id: "", quantity_change: "", adjustment_type: "MANUAL_ADJUSTMENT", reason: "" });
+      onRefreshMedicines();
       await loadStock();
     } catch (e) {
       setError(e.message);
@@ -390,6 +391,7 @@ export default function StockView({ medicinesList = [], token, userRole }) {
       setSuccess("Opening stock balance initialized successfully!");
       setInitForm({ medicine_id: "", quantity: "", initialized_date: todayStr, notes: "" });
       setHandle409(false);
+      onRefreshMedicines();
       await loadStock();
     } catch (e) {
       if (e.status === 409) {
