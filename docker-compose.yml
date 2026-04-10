@@ -24,6 +24,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - SECRET_KEY=${SECRET_KEY}
+      - PORT=8000
     ports:
       - "8000:8000"
     depends_on:
@@ -36,6 +37,8 @@ services:
     build: ./frontend
     container_name: pharmacy_frontend
     restart: always
+    environment:
+      - BACKEND_URL=http://backend:8000
     ports:
       - "5173:80"
     depends_on:

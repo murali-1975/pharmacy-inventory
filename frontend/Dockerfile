@@ -20,8 +20,8 @@ FROM nginx:alpine
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy Nginx configuration template for dynamic environment variable substitution
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Expose port (Nginx default is 80)
 EXPOSE 80
