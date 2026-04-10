@@ -3,7 +3,7 @@ import { Package, CreditCard, TrendingUp, AlertCircle, Loader2 } from 'lucide-re
 import { StatCard } from '../components/common/Common';
 import { formatDate } from '../utils/dateUtils';
 
-const DashboardHome = ({ setView, invoices = [], token }) => {
+const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {} }) => {
   const [stats, setStats] = useState({
     total_medicines: 0,
     pending_invoices_amount: 0,
@@ -20,6 +20,10 @@ const DashboardHome = ({ setView, invoices = [], token }) => {
             'Authorization': `Bearer ${token}`
           }
         });
+        if (response.status === 401) {
+          onUnauthorized();
+          return;
+        }
         if (response.ok) {
           const data = await response.json();
           setStats(data);

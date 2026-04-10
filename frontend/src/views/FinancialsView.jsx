@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { StatCard } from '../components/common/Common';
 
-const FinancialsView = ({ token }) => {
+const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -37,6 +37,11 @@ const FinancialsView = ({ token }) => {
         fetch(`/api/financials/gst?start_date=${dateRange.start}&end_date=${dateRange.end}`, { headers }),
         fetch(`/api/financials/profit?start_date=${dateRange.start}&end_date=${dateRange.end}`, { headers })
       ]);
+
+      if (valRes.status === 401 || agingRes.status === 401 || gstRes.status === 401 || profitRes.status === 401) {
+        onUnauthorized();
+        return;
+      }
 
       if (!valRes.ok || !agingRes.ok || !gstRes.ok || !profitRes.ok) {
         throw new Error("Failed to fetch one or more financial reports.");

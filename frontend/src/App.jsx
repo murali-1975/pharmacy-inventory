@@ -199,7 +199,7 @@ const App = () => {
         />
 
         <section className="flex-1 overflow-y-auto p-10 bg-[#f9fafc]">
-          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} invoices={invoices} token={token} />}
+          {activeTab === 'dashboard' && <DashboardHome setView={setActiveTab} invoices={invoices} token={token} onUnauthorized={logout} />}
           {activeTab === 'suppliers' && (
             <SuppliersView 
               suppliers={suppliers} 
@@ -238,13 +238,13 @@ const App = () => {
             />
           )}
           {activeTab === 'dispensing' && (
-            <DispensingView medicines={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} />
+            <DispensingView medicines={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} onUnauthorized={logout} />
           )}
           {activeTab === 'stock' && (
-            <StockView medicinesList={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} />
+            <StockView medicinesList={medicines} onRefreshMedicines={fetchMedicines} token={token} userRole={currentUser?.role} onUnauthorized={logout} />
           )}
           {activeTab === 'financials' && currentUser?.role === 'Admin' && (
-            <FinancialsView token={token} />
+            <FinancialsView token={token} onUnauthorized={logout} />
           )}
           {activeTab === 'admin' && currentUser?.role === 'Admin' && (
             <AdminView 

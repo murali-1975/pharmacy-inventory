@@ -124,7 +124,7 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
  * @param {string} props.token - JWT authentication token.
  * @param {string} props.userRole - Current user's role (Admin, Staff, etc.).
  */
-export default function DispensingView({ medicines = [], onRefreshMedicines = () => {}, token, userRole }) {
+export default function DispensingView({ medicines = [], onRefreshMedicines = () => {}, token, userRole, onUnauthorized = () => {} }) {
   const todayStr = new Date().toISOString().split("T")[0];
 
   // --- API Helpers (Internal) ---
@@ -136,6 +136,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
     if (params.skip !== undefined) qs.append("skip", params.skip);
     qs.append("limit", params.limit || 20);
     const res = await fetch(`${API_BASE}/dispensing/?${qs}`, { headers: authHeaders(token) });
+    if (res.status === 401) { onUnauthorized(); return; }
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.detail || "Failed to fetch dispensing records");
@@ -149,6 +150,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
       headers: authHeaders(token),
       body: JSON.stringify(payload),
     });
+    if (res.status === 401) { onUnauthorized(); return; }
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Failed to record dispensing");
     return data;
@@ -158,6 +160,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
     const res = await fetch(`${API_BASE}/stock/${medicineId}/batches?active_only=true`, {
       headers: authHeaders(token),
     });
+    if (res.status === 401) { onUnauthorized(); return; }
     if (!res.ok) throw new Error("Failed to fetch batch info");
     const batches = await res.json();
     return batches.length > 0 ? batches[0] : null;
@@ -168,6 +171,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
       method: "DELETE",
       headers: authHeaders(token),
     });
+    if (res.status === 401) { onUnauthorized(); return; }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.detail || "Failed to cancel dispensing");
@@ -182,6 +186,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
+    if (res.status === 401) { onUnauthorized(); return; }
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Upload failed");
     return data;

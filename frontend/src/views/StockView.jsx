@@ -38,6 +38,7 @@ async function fetchStock(token, search = "", skip = 0, limit = 20) {
     url += `&search=${encodeURIComponent(search)}`;
   }
   const res = await fetch(url, { headers: authHeaders(token) });
+  if (res.status === 401) { onUnauthorized(); return; }
   if (!res.ok) throw new Error("Failed to fetch stock data");
   return res.json();
 }
@@ -46,6 +47,7 @@ async function fetchAdjustments(token, medicineId) {
   const res = await fetch(`${API_BASE}/stock/${medicineId}/adjustments`, {
     headers: authHeaders(token),
   });
+  if (res.status === 401) { onUnauthorized(); return; }
   if (!res.ok) throw new Error("Failed to fetch adjustment history");
   return res.json();
 }
@@ -56,6 +58,7 @@ async function postAdjustment(token, payload) {
     headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
+  if (res.status === 401) { onUnauthorized(); return; }
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Adjustment failed");
   return data;
@@ -68,6 +71,7 @@ async function postInitialize(token, payload, force = false) {
     headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
+  if (res.status === 401) { onUnauthorized(); return; }
   const data = await res.json();
   if (!res.ok) {
     const err = new Error(data.detail || "Initialization failed");
@@ -152,7 +156,7 @@ function Spinner() {
  * @param {string} props.token - JWT authentication token.
  * @param {string} props.userRole - Current user's role.
  */
-export default function StockView({ medicinesList = [], onRefreshMedicines = () => {}, token, userRole }) {
+export default function StockView({ medicinesList = [], onRefreshMedicines = () => {}, token, userRole, onUnauthorized = () => {} }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [stockData, setStockData] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);

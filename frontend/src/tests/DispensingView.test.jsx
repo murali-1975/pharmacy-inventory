@@ -380,4 +380,33 @@ describe('DispensingView', () => {
       expect(screen.getByText(/Dispensing record cancelled/i)).toBeInTheDocument();
     });
   });
+
+  it('triggers onUnauthorized when API returns 401', async () => {
+    const mockUnauthorized = vi.fn();
+    
+    // Mock 401 response
+    globalThis.fetch.mockResolvedValueOnce({
+      status: 401,
+      ok: false,
+      json: async () => ({ detail: "Could not validate credentials" })
+    });
+
+    render(
+      <DispensingView 
+        medicines={mockMedicines} 
+        onRefreshMedicines={mockOnRefresh} 
+        onUnauthorized={mockUnauthorized} 
+        token={mockToken} 
+        userRole={mockUserRole} 
+      />
+    );
+    
+    // Trigger history load which should call fetch
+    fireEvent.click(screen.getByText(/Dispensing History/i));
+    fireEvent.click(screen.getByText('🔍 Search'));
+
+    await waitFor(() => {
+      expect(mockUnauthorized).toHaveBeenCalled();
+    });
+  });
 });
