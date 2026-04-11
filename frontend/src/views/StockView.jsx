@@ -64,8 +64,10 @@ async function postAdjustment(token, payload) {
   return data;
 }
 
-async function postInitialize(token, payload, force = false) {
-  const url = `${API_BASE}/stock/initialize${force ? "?force=true" : ""}`;
+async function postInitialize(token, payload, forceOverride = false) {
+  let url = `${API_BASE}/stock/initialize`;
+  if (forceOverride) url += "?force_override=true";
+
   const res = await fetch(url, {
     method: "POST",
     headers: authHeaders(token),
@@ -79,6 +81,18 @@ async function postInitialize(token, payload, force = false) {
     throw err;
   }
   return data;
+}
+
+
+async function fetchStockLedger(token, fromDate, toDate, search = "", skip = 0, limit = 20, onUnauthorized = () => {}) {
+  let url = `${API_BASE}/stock/ledger?from_date=${fromDate}&to_date=${toDate}&skip=${skip}&limit=${limit}`;
+  if (search) {
+    url += `&search=${encodeURIComponent(search)}`;
+  }
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (res.status === 401) { onUnauthorized(); return; }
+  if (!res.ok) throw new Error("Failed to fetch inventory ledger");
+  return res.json();
 }
 
 // -----------------------------------------------------------------------
@@ -170,6 +184,21 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
 
   // History panel state
   const [selectedMedicine, setSelectedMedicine] = useState(null);
+  
+  // Ledger State
+  const [ledgerData, setLedgerData] = useState([]);
+  const [ledgerTotal, setLedgerTotal] = useState(0);
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  
+  // Date ranges (default last 30 days for ledger)
+  const defaultTo = new Date().toISOString().split('T')[0];
+  const last30 = new Date();
+  last30.setDate(last30.getDate() - 30);
+  const defaultFrom = last30.toISOString().split('T')[0];
+  
+  const [dateRange, setDateRange] = useState({ from: defaultFrom, to: defaultTo });
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -223,6 +252,12 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, loadStock]);
+
+  useEffect(() => {
+    if (activeTab === "ledger") {
+      loadLedger(ledgerPage, ledgerSearch);
+    }
+  }, [activeTab, ledgerPage, ledgerSearch, dateRange.from, dateRange.to]);
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > Math.ceil(totalRecords / pageSize)) return;
@@ -345,6 +380,82 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
     }
   };
 
+  const loadLedger = async (page = 1, search = "") => {
+    setLedgerLoading(true);
+    setError("");
+    try {
+      const skip = (page - 1) * pageSize;
+      const data = await fetchStockLedger(token, dateRange.from, dateRange.to, search, skip, pageSize, onUnauthorized);
+      if (data) {
+        setLedgerData(data.items);
+        setLedgerTotal(data.total);
+        setLedgerPage(page);
+      }
+    } catch (e) {
+      setError("Failed to load inventory ledger: " + e.message);
+      console.error("StockView: loadLedger error", e);
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  const handleExportLedgerPDF = async () => {
+    setLoading(true);
+    setSuccess("");
+    setError("");
+    try {
+      // Fetch ALL records for the ledger range without pagination
+      const data = await fetchStockLedger(token, dateRange.from, dateRange.to, ledgerSearch, 0, 10000, onUnauthorized);
+      const allItems = data.items;
+      
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for more columns
+      const dateStr = new Date().toLocaleDateString();
+      
+      doc.setFontSize(20);
+      doc.setTextColor(6, 148, 162);
+      doc.text("Inventory Movement Ledger", 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Period: ${dateRange.from} to ${dateRange.to}`, 14, 28);
+      doc.text(`Generated: ${dateStr} | Total Records: ${data.total}`, 14, 34);
+      
+      const tableData = allItems.map((item, index) => [
+        index + 1,
+        item.product_name,
+        item.opening_balance,
+        item.quantity_in,
+        item.quantity_out,
+        item.stock_in_hand
+      ]);
+      
+      autoTable(doc, {
+        startY: 40,
+        head: [['S.No', 'Medicine Name', 'Opening Balance', 'Qty In', 'Qty Out', 'Stock in Hand']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [6, 148, 162], textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 'auto' },
+          2: { halign: 'center', cellWidth: 35 },
+          3: { halign: 'center', cellWidth: 35 },
+          4: { halign: 'center', cellWidth: 35 },
+          5: { halign: 'center', cellWidth: 35, fontStyle: 'bold' },
+        }
+      });
+      
+      const fileName = `Inventory_Ledger_${dateRange.from}_to_${dateRange.to}.pdf`;
+      doc.save(fileName);
+      setSuccess("Complete Inventory Ledger exported successfully!");
+    } catch (e) {
+      setError("Export failed: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAdjustSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -418,6 +529,7 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
     { id: "pricing", label: "🏷️ Price List" },
     { id: "initialize", label: "🔢 Initialize Stock", adminOnly: true },
     { id: "adjust", label: "✏️ Adjust Stock", adminOnly: true },
+    { id: "ledger", label: "📖 Inventory Ledger" },
   ];
 
   return (
@@ -816,7 +928,7 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
           </p>
           {handle409 && (
             <div style={styles.warnBox}>
-              ⚠️ This medicine already has an Opening Balance. Tick the checkbox to force-replace it.
+              This medicine already has an Opening Balance. Tick the checkbox to force-replace it.
               <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", fontWeight: 600, fontSize: "13px", cursor: "pointer" }}>
                 <input
                   type="checkbox"
@@ -953,6 +1065,122 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
               {adjusting ? "Applying..." : "Apply Adjustment"}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Inventory Ledger Tab */}
+      {activeTab === "ledger" && (
+        <div style={ledgerStyles.ledgerContainer}>
+          <div style={ledgerStyles.filterBar}>
+            <div style={ledgerStyles.dateGroup}>
+              <label htmlFor="ledger_from" style={ledgerStyles.label}>From:</label>
+              <input 
+                id="ledger_from"
+                type="date" 
+                style={ledgerStyles.dateInput} 
+                value={dateRange.from} 
+                onChange={(e) => setDateRange({...dateRange, from: e.target.value})}
+              />
+              <label htmlFor="ledger_to" style={ledgerStyles.label}>To:</label>
+              <input 
+                id="ledger_to"
+                type="date" 
+                style={ledgerStyles.dateInput} 
+                value={dateRange.to} 
+                onChange={(e) => setDateRange({...dateRange, to: e.target.value})}
+              />
+            </div>
+            
+            <div style={styles.searchWrapper}>
+              <span style={styles.searchIcon}>🔍</span>
+              <input
+                type="text"
+                placeholder="Search brand name..."
+                value={ledgerSearch}
+                onChange={(e) => setLedgerSearch(e.target.value)}
+                style={styles.searchInput}
+              />
+            </div>
+
+            <button 
+              onClick={handleExportLedgerPDF}
+              style={ledgerStyles.exportBtn}
+              disabled={ledgerLoading || ledgerData.length === 0}
+            >
+              <Download size={16} style={{marginRight: '8px'}} /> Export PDF
+            </button>
+          </div>
+
+          {ledgerLoading ? <Spinner /> : (
+            <>
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHead}>
+                      <th style={styles.th}>Medicine Name</th>
+                      <th style={{...styles.th, textAlign: 'center'}}>Opening Bal</th>
+                      <th style={{...styles.th, textAlign: 'center'}}>Qty In</th>
+                      <th style={{...styles.th, textAlign: 'center'}}>Qty Out</th>
+                      <th style={{...styles.th, textAlign: 'center'}}>In Hand</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerData.map((item) => (
+                      <tr key={item.medicine_id} style={styles.row}>
+                        <td style={styles.td}>
+                          <div style={{fontWeight: 'bold'}}>{item.product_name}</div>
+                          <div style={styles.genericName}>{item.generic_name}</div>
+                        </td>
+                        <td style={{...styles.td, textAlign: 'center'}}>{item.opening_balance}</td>
+                        <td style={{...styles.td, textAlign: 'center', color: '#059669', fontWeight: 'bold'}}>+{item.quantity_in}</td>
+                        <td style={{...styles.td, textAlign: 'center', color: '#dc2626', fontWeight: 'bold'}}>-{item.quantity_out}</td>
+                        <td style={{...styles.td, textAlign: 'center', fontWeight: '800', backgroundColor: '#f9fafb'}}>{item.stock_in_hand}</td>
+                      </tr>
+                    ))}
+                    {ledgerData.length === 0 && (
+                      <tr>
+                        <td colSpan="5" style={{...styles.td, textAlign: 'center', padding: '40px', color: '#6b7280'}}>
+                          No inventory movement found for this period. Try adjusting the dates.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Ledger Pagination */}
+              {ledgerTotal > pageSize && (
+                <div style={styles.paginationRow}>
+                  <div style={styles.paginationSummary}>
+                    Showing <strong>{(ledgerPage - 1) * pageSize + 1}</strong> - <strong>{Math.min(ledgerPage * pageSize, ledgerTotal)}</strong> of <strong>{ledgerTotal}</strong>
+                  </div>
+                  <div style={styles.paginationControls}>
+                    <button 
+                      style={ledgerPage === 1 ? styles.pageBtnDisabled : styles.pageBtn} 
+                      onClick={() => setLedgerPage(1)} 
+                      disabled={ledgerPage === 1}
+                    ><ChevronsLeft size={16} /></button>
+                    <button 
+                      style={ledgerPage === 1 ? styles.pageBtnDisabled : styles.pageBtn} 
+                      onClick={() => setLedgerPage(ledgerPage - 1)} 
+                      disabled={ledgerPage === 1}
+                    ><ChevronLeft size={16} /></button>
+                    <span style={styles.pageIndicator}>Page {ledgerPage} of {Math.ceil(ledgerTotal / pageSize)}</span>
+                    <button 
+                      style={ledgerPage >= Math.ceil(ledgerTotal / pageSize) ? styles.pageBtnDisabled : styles.pageBtn} 
+                      onClick={() => setLedgerPage(ledgerPage + 1)} 
+                      disabled={ledgerPage >= Math.ceil(ledgerTotal / pageSize)}
+                    ><ChevronRight size={16} /></button>
+                    <button 
+                      style={ledgerPage >= Math.ceil(ledgerTotal / pageSize) ? styles.pageBtnDisabled : styles.pageBtn} 
+                      onClick={() => setLedgerPage(Math.ceil(ledgerTotal / pageSize))} 
+                      disabled={ledgerPage >= Math.ceil(ledgerTotal / pageSize)}
+                    ><ChevronsRight size={16} /></button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -1355,4 +1583,56 @@ const styles = {
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
+};
+
+const ledgerStyles = {
+  ledgerContainer: {
+    marginTop: '10px'
+  },
+  filterBar: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '20px',
+    marginBottom: '20px',
+    backgroundColor: '#fff',
+    padding: '15px',
+    borderRadius: '12px',
+    border: '1px solid #f1f5f9',
+    flexWrap: 'wrap'
+  },
+  dateGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  label: {
+    fontSize: '12px',
+    fontWeight: 'bold',
+    color: '#64748b',
+    textTransform: 'uppercase'
+  },
+  dateInput: {
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    fontSize: '14px',
+    color: '#1e293b',
+    outline: 'none',
+    cursor: 'pointer'
+  },
+  exportBtn: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '10px 20px',
+    backgroundColor: '#0694a2',
+    color: 'white',
+    borderRadius: '10px',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  }
 };

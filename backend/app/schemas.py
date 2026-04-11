@@ -343,6 +343,23 @@ class PaginatedStockSchema(BaseModel):
     total: int
     items: List[MedicineStockSchema]
 
+class StockLedgerSchema(BaseModel):
+    """Movement report entry for a medicine over a period."""
+    medicine_id: int
+    product_name: str
+    generic_name: Optional[str] = None
+    category: Optional[str] = None
+    uom: Optional[str] = None
+    opening_balance: Union[int, float]
+    quantity_in: Union[int, float]
+    quantity_out: Union[int, float]
+    stock_in_hand: Union[int, float]
+
+class PaginatedStockLedger(BaseModel):
+    """Envelope for paginated stock ledger entries."""
+    total: int
+    items: List[StockLedgerSchema]
+
 class StockAdjustmentCreate(BaseModel):
     """
     Request payload for an admin-initiated manual stock adjustment.

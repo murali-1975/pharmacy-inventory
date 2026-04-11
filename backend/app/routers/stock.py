@@ -17,6 +17,7 @@ Access:
 """
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List
@@ -117,6 +118,91 @@ def list_stock(
                 item.gst_percent = pricing["gst_percent"]
         
         return {"total": total, "items": items}
+
+
+# ---------------------------------------------------------------------------
+# LEDGER Endpoint (Audit & Reconciliation)
+# ---------------------------------------------------------------------------
+
+@router.get("/ledger", response_model=schemas.PaginatedStockLedger)
+def get_stock_ledger(
+    from_date: datetime.date,
+    to_date: datetime.date,
+    search: str = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(database.get_db),
+):
+    """
+    Generate a period-based inventory ledger for all medicines.
+    Provides Open Balance, Additions, Deletions, and Closing Balance for a date range.
+    Includes zero-activity medicines for complete audit visibility.
+    """
+    from_dt = datetime.datetime.combine(from_date, datetime.time.min)
+    to_dt = datetime.datetime.combine(to_date, datetime.time.max)
+    
+    logger.info(f"Inventory Ledger request received: from={from_date} to={to_date}, search='{search}'")
+    
+    with utils.db_error_handler("stock ledger generation"):
+        try:
+            # 1. Subquery for Opening Balance (all changes BEFORE from_date)
+            opening_sub = db.query(
+                models.StockAdjustment.medicine_id,
+                func.sum(models.StockAdjustment.quantity_change).label("opening")
+            ).filter(models.StockAdjustment.adjusted_at < from_dt).group_by(models.StockAdjustment.medicine_id).subquery()
+
+            # 2. Subquery for Period Movements (changes BETWEEN from_date and to_date)
+            movement_sub = db.query(
+                models.StockAdjustment.medicine_id,
+                func.sum(case(((models.StockAdjustment.quantity_change > 0), models.StockAdjustment.quantity_change)), else_=0).label("qty_in"),
+                func.sum(case(((models.StockAdjustment.quantity_change < 0), models.StockAdjustment.quantity_change)), else_=0).label("qty_out")
+            ).filter(
+                models.StockAdjustment.adjusted_at >= from_dt,
+                models.StockAdjustment.adjusted_at <= to_dt
+            ).group_by(models.StockAdjustment.medicine_id).subquery()
+
+            # 3. Main Query: Join Medicine with subqueries to get the full list (standard accounting includes static balances)
+            query = db.query(
+                models.Medicine.id.label("medicine_id"),
+                models.Medicine.product_name,
+                models.Medicine.generic_name,
+                models.Medicine.category,
+                models.Medicine.uom,
+                func.coalesce(opening_sub.c.opening, 0).label("opening_balance"),
+                func.coalesce(movement_sub.c.qty_in, 0).label("quantity_in"),
+                func.coalesce(movement_sub.c.qty_out, 0).label("quantity_out_raw")
+            ).outerjoin(opening_sub, models.Medicine.id == opening_sub.c.medicine_id)\
+             .outerjoin(movement_sub, models.Medicine.id == movement_sub.c.medicine_id)
+            
+            if search:
+                query = query.filter(models.Medicine.product_name.ilike(f"%{search}%"))
+            
+            total = query.count()
+            items_raw = query.order_by(models.Medicine.product_name.asc()).offset(skip).limit(limit).all()
+            
+            # 4. Final Calculations (Closing = Opening + In - abs(Out))
+            results = []
+            for row in items_raw:
+                qty_out = abs(row.quantity_out_raw)
+                results.append({
+                    "medicine_id": row.medicine_id,
+                    "product_name": row.product_name,
+                    "generic_name": row.generic_name,
+                    "category": row.category,
+                    "uom": row.uom,
+                    "opening_balance": row.opening_balance,
+                    "quantity_in": row.quantity_in,
+                    "quantity_out": qty_out,
+                    "stock_in_hand": row.opening_balance + row.quantity_in - qty_out
+                })
+                
+            return {"total": total, "items": results}
+        except Exception as e:
+            logger.error(f"Unexpected error in stock ledger: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unexpected error occurred during ledger generation."
+            )
 
 
 @router.get("/{medicine_id}", response_model=schemas.MedicineStockSchema)
@@ -455,4 +541,5 @@ def initialize_stock(
             f"'{medicine.product_name}' (ID: {init_in.medicine_id}): "
             f"{init_in.quantity} units as of {init_in.initialized_date}."
         )
+        return db_adjustment
         return db_adjustment
