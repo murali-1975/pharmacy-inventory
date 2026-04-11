@@ -23,6 +23,12 @@ DB_INSTANCE="pharmacy-db-mumbai"
 DB_NAME="pharmacy_prod"
 DB_USER="pharmacy_admin"
 
+# Source local secrets if available
+if [ -f ".env.gcp" ]; then
+    echo "🔑 Sourcing secrets from .env.gcp..."
+    source .env.gcp
+fi
+
 echo "------------------------------------------------------------"
 echo "🚀 Starting Deployment for Project: $PROJECT_ID"
 echo "📍 Region: $REGION"
@@ -62,8 +68,12 @@ fi
 # Ensure Database and User exist
 echo "🛠️ Configuring Database and User..."
 gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE || echo "DB already exists."
-echo "Please enter a password for the database user '$DB_USER':"
-read -s DB_PASSWORD
+if [ -z "$DB_PASSWORD" ]; then
+    echo "Please enter a password for the database user '$DB_USER':"
+    read -s DB_PASSWORD
+else
+    echo "🔑 Using DB_PASSWORD from environment/.env.gcp"
+fi
 
 if gcloud sql users describe $DB_USER --instance=$DB_INSTANCE >/dev/null 2>&1; then
     echo "🔐 User exists. Updating password..."
@@ -92,8 +102,12 @@ DATABASE_URL="postgresql+psycopg2://$DB_USER:$DB_PASSWORD@/$DB_NAME?host=/clouds
 echo "Creating PHARMACY_DB_URL secret..."
 create_secret "PHARMACY_DB_URL" "$DATABASE_URL"
 
-echo "Please enter a random string for your JWT SECRET_KEY:"
-read -s SEC_KEY_VAL
+if [ -z "$SEC_KEY_VAL" ]; then
+    echo "Please enter a random string for your JWT SECRET_KEY:"
+    read -s SEC_KEY_VAL
+else
+    echo "🔑 Using SEC_KEY_VAL from environment/.env.gcp"
+fi
 create_secret "PHARMACY_SECRET_KEY" "$SEC_KEY_VAL"
 
 # 5. Build and Push Images using Cloud Build

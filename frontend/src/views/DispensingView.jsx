@@ -59,7 +59,19 @@ function grandTotal(rows) {
  * Searchable Medicine Selector 
  * Provides an autocomplete experience for bulk row entry.
  */
-function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Search medicine..." }) {
+/** 
+ * Searchable Medicine Selector 
+ * Provides an autocomplete experience for bulk row entry and history filtering.
+ */
+function MedicineSearchSelect({ 
+  medicines, 
+  value, 
+  onSelect, 
+  placeholder = "Search medicine...", 
+  allowZeroStock = false,
+  showAllOption = false,
+  id
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch]   = useState("");
   
@@ -67,17 +79,24 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
   const selectedMed = medicines.find(m => String(m.id) === String(value));
   const displayName = selectedMed 
     ? `${selectedMed.product_name} (${selectedMed.quantity_on_hand})`
-    : "";
+    : (value === "" && showAllOption ? "All Medicines" : "");
 
-  const filtered = medicines.filter(m => 
-    (m.product_name.toLowerCase().includes(search.toLowerCase()) ||
-     m.generic_name?.toLowerCase().includes(search.toLowerCase())) &&
-    m.quantity_on_hand > 0
-  ).slice(0, 50); // Performance cap
+  const filtered = medicines.filter(m => {
+    // Search by product name
+    const matchesSearch = (
+      m.product_name.toLowerCase().includes(search.toLowerCase())
+    );
+    
+    // Quantity logic: allowZeroStock (for history) vs stock > 0 (for recording)
+    const hasStock = allowZeroStock || m.quantity_on_hand > 0;
+    
+    return matchesSearch && hasStock;
+  }).slice(0, 50); // Performance cap
 
   return (
     <div style={s.searchContainer}>
       <input
+        id={id}
         type="text"
         style={s.cellInput}
         placeholder={placeholder}
@@ -88,6 +107,17 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
       />
       {isOpen && (
         <div style={s.searchDropdown}>
+          {showAllOption && (
+            <div
+              style={{ ...s.searchResultItem, fontWeight: 700, color: "#0694a2" }}
+              onMouseDown={() => {
+                onSelect("");
+                setIsOpen(false);
+              }}
+            >
+              All Medicines
+            </div>
+          )}
           {filtered.length === 0 ? (
             <div style={s.searchNoResult}>No matches found</div>
           ) : (
@@ -101,7 +131,6 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
                 }}
               >
                 <div style={s.resName}>{m.product_name} ({m.quantity_on_hand})</div>
-                <div style={s.resGeneric}>{m.generic_name}</div>
               </div>
             ))
           )}
@@ -126,6 +155,11 @@ function MedicineSearchSelect({ medicines, value, onSelect, placeholder = "Searc
  */
 export default function DispensingView({ medicines = [], onRefreshMedicines = () => {}, token, userRole, onUnauthorized = () => {} }) {
   const todayStr = new Date().toISOString().split("T")[0];
+
+  // Alphabetize medicines for all dropdowns and search components
+  const sortedMedicines = React.useMemo(() => {
+    return [...medicines].sort((a, b) => a.product_name.localeCompare(b.product_name));
+  }, [medicines]);
 
   // --- API Helpers (Internal) ---
   const fetchDispensing = async (token, params = {}) => {
@@ -578,7 +612,7 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
                     <tr key={row._id} style={{ background: rowBg, borderBottom: "1px solid #EDF2F7" }}>
                       <td style={s.inputCell}>
                         <MedicineSearchSelect
-                          medicines={medicines}
+                          medicines={sortedMedicines}
                           value={row.medicine_id}
                           onSelect={(val) => updateRow(i, "medicine_id", val)}
                         />
@@ -845,16 +879,16 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
               value={filters.date}
               onChange={(e) => setFilters({ ...filters, date: e.target.value })}
             />
-            <select
-              style={s.filterSelect}
-              value={filters.medicine_id}
-              onChange={(e) => setFilters({ ...filters, medicine_id: e.target.value })}
-            >
-              <option value="">All Medicines</option>
-              {medicines.map((m) => (
-                <option key={m.id} value={m.id}>{m.product_name}</option>
-              ))}
-            </select>
+            <div style={{ ...s.filterInput, padding: 0, minWidth: "220px", border: "none" }}>
+              <MedicineSearchSelect 
+                medicines={sortedMedicines}
+                value={filters.medicine_id}
+                onSelect={(val) => setFilters({ ...filters, medicine_id: val })}
+                placeholder="All Medicines..."
+                allowZeroStock={true}
+                showAllOption={true}
+              />
+            </div>
             <input
               type="text"
               style={s.filterInput}

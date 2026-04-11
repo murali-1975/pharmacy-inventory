@@ -44,6 +44,9 @@ frontend/dist/
 *.log
 *.txt
 backend/test_pharmacy_inventory.db
+test_*.db
+current_changes.diff
+.env.gcp
 frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/

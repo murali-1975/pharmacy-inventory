@@ -505,13 +505,16 @@ def initialize_stock(
                 batch_no="OPENING-STOCK",
                 expiry_date=default_expiry,
                 quantity_on_hand=init_in.quantity,
-                purchase_price=0.0, # Defaulting for opening stock
-                mrp=0.0,
+                purchase_price=medicine.unit_price, # Use master price for opening stock cost basis
+                mrp=medicine.unit_price,           # Initialize MRP from medicine master
             )
             db.add(batch_record)
         else:
             # For initialize stock, we SET the batch quantity to match the total
             batch_record.quantity_on_hand = init_in.quantity
+            # Sync pricing even on override if requested via force
+            batch_record.mrp = medicine.unit_price
+            batch_record.purchase_price = medicine.unit_price
             # If multiple batches existed before, this initialization effectively 
             # consolidates them into the "Opening" record if force=True was used.
 

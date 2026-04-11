@@ -152,6 +152,70 @@ function Spinner() {
   );
 }
 
+/** 
+ * Searchable Medicine Selector 
+ * Provides an autocomplete experience for stock initialization and adjustment.
+ */
+function MedicineSearchSelect({ medicines, stockData, value, onSelect, placeholder = "Search medicine...", id }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch]   = useState("");
+  
+  // Find the selected medicine name for display when not searching
+  const selectedMed = medicines.find(m => String(m.id) === String(value));
+  let displayName = "";
+  if (selectedMed) {
+    const sItem = stockData.find(s => s.medicine_id === selectedMed.id);
+    displayName = `${selectedMed.product_name} ${sItem ? `(Current: ${sItem.quantity_on_hand})` : "(No Stock)"}`;
+  }
+
+  const filtered = medicines.filter(m => 
+    m.product_name.toLowerCase().includes(search.toLowerCase())
+  ).slice(0, 50);
+
+  return (
+    <div style={styles.searchContainer}>
+      <input
+        id={id}
+        type="text"
+        style={styles.input}
+        placeholder={placeholder}
+        value={isOpen ? search : displayName}
+        onFocus={() => { setIsOpen(true); setSearch(""); }}
+        onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      {isOpen && (
+        <div style={styles.searchDropdown}>
+          {filtered.length === 0 ? (
+            <div style={styles.searchNoResult}>No matches found</div>
+          ) : (
+            filtered.map((m) => {
+              const sItem = stockData.find(s => s.medicine_id === m.id);
+              return (
+                <div
+                  key={m.id}
+                  style={styles.searchResultItem}
+                  onMouseDown={() => {
+                    onSelect(m.id);
+                    setIsOpen(false);
+                  }}
+                >
+                  <div style={styles.resName}>
+                    {m.product_name} 
+                    <span style={{ fontSize: "11px", color: sItem ? "#276749" : "#718096", marginLeft: "8px" }}>
+                      {sItem ? `(Current: ${sItem.quantity_on_hand})` : "(No Stock Record)"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // -----------------------------------------------------------------------
 // Main Component
 // -----------------------------------------------------------------------
@@ -172,6 +236,11 @@ function Spinner() {
  */
 export default function StockView({ medicinesList = [], onRefreshMedicines = () => {}, token, userRole, onUnauthorized = () => {} }) {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Alphabetize medicines for initialization and adjustment selects
+  const sortedMedicines = React.useMemo(() => {
+    return [...medicinesList].sort((a, b) => a.product_name.localeCompare(b.product_name));
+  }, [medicinesList]);
   const [stockData, setStockData] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [currentPage, setCurrentPage]   = useState(1);
@@ -942,23 +1011,18 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
           )}
           <form onSubmit={handleInitSubmit} style={{ ...styles.form, marginTop: "16px" }}>
             <label htmlFor="init_medicine_id" style={styles.label}>Medicine</label>
-            <select
+            <MedicineSearchSelect 
               id="init_medicine_id"
+              medicines={sortedMedicines}
+              stockData={stockData}
               value={initForm.medicine_id}
-              onChange={(e) => { setInitForm({ ...initForm, medicine_id: e.target.value }); setHandle409(false); setError(""); }}
-              style={styles.select}
-              required
-            >
-              <option value="">— Select a medicine —</option>
-              {medicinesList.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.product_name} 
-                  {stockData.find(s => s.medicine_id === m.id) 
-                    ? ` (Current: ${stockData.find(s => s.medicine_id === m.id).quantity_on_hand})`
-                    : " (No Stock Record)"}
-                </option>
-              ))}
-            </select>
+              onSelect={(val) => { 
+                setInitForm({ ...initForm, medicine_id: val }); 
+                setHandle409(false); 
+                setError(""); 
+              }}
+              placeholder="Type to find medicine..."
+            />
 
             <label htmlFor="init_quantity" style={styles.label}>Opening Quantity</label>
             <input
@@ -1011,23 +1075,14 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
           </p>
           <form onSubmit={handleAdjustSubmit} style={styles.form}>
             <label htmlFor="adjust_medicine_id" style={styles.label}>Medicine</label>
-            <select
+            <MedicineSearchSelect 
               id="adjust_medicine_id"
+              medicines={sortedMedicines}
+              stockData={stockData}
               value={adjustForm.medicine_id}
-              onChange={(e) => setAdjustForm({ ...adjustForm, medicine_id: e.target.value })}
-              style={styles.select}
-              required
-            >
-              <option value="">— Select a medicine —</option>
-              {medicinesList.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.product_name}
-                  {stockData.find(s => s.medicine_id === m.id) 
-                    ? ` (Current: ${stockData.find(s => s.medicine_id === m.id).quantity_on_hand})`
-                    : " (No Stock Record)"}
-                </option>
-              ))}
-            </select>
+              onSelect={(val) => setAdjustForm({ ...adjustForm, medicine_id: val })}
+              placeholder="Type to find medicine..."
+            />
 
             <label htmlFor="adjust_quantity_change" style={styles.label}>Quantity Change</label>
             <input
@@ -1191,6 +1246,30 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
 // Styles
 // -----------------------------------------------------------------------
 const styles = {
+  searchContainer: { position: "relative", width: "100%", marginBottom: "4px" },
+  searchDropdown: {
+    position: "absolute",
+    top: "calc(100% + 4px)",
+    left: 0,
+    right: 0,
+    background: "white",
+    border: "1px solid #E2E8F0",
+    borderRadius: "8px",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+    zIndex: 1000,
+    maxHeight: "350px",
+    overflowY: "auto",
+    padding: "4px",
+  },
+  searchResultItem: {
+    padding: "10px 14px",
+    cursor: "pointer",
+    borderRadius: "6px",
+    transition: "background 0.2s",
+    hover: { background: "#F7FAFC" },
+  },
+  searchNoResult: { padding: "12px", color: "#A0AEC0", textAlign: "center", fontSize: "13px" },
+  resName: { fontSize: "14px", fontWeight: 600, color: "#2D3748", display: "flex", justifyContent: "space-between", alignItems: "center" },
   container: {
     padding: "24px",
     fontFamily: "'Inter', 'Segoe UI', sans-serif",

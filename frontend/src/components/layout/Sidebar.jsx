@@ -14,8 +14,8 @@ const Sidebar = ({
   return (
     <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white border-r border-gray-100 flex flex-col transition-all duration-500 ease-in-out z-30 shadow-2xl shadow-gray-200/50`}>
       <div className="p-8 flex items-center space-x-4">
-        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-200 shrink-0 transform hover:rotate-12 transition-transform cursor-pointer">
-          <img src={logo} alt="Omniflow Logo" className="w-8 h-8 object-contain brightness-0 invert" />
+        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-100/50 shrink-0 transform hover:rotate-12 transition-transform cursor-pointer border border-gray-100 p-2">
+          <img src={logo} alt="Omniflow Logo" className="w-10 h-10 object-contain" />
         </div>
         {sidebarOpen && (
           <div className="overflow-hidden whitespace-nowrap">

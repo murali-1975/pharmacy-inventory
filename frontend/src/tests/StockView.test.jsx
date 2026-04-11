@@ -174,8 +174,13 @@ describe('StockView Component', () => {
 
     fireEvent.click(screen.getByText(/Adjust Stock/i));
     
-    // Fill the form
-    fireEvent.change(screen.getByLabelText(/Medicine/i, { selector: 'select' }), { target: { value: '1' } });
+    // Search and select medicine
+    const medicineInput = screen.getByLabelText(/Medicine/i);
+    fireEvent.focus(medicineInput);
+    fireEvent.change(medicineInput, { target: { value: 'Paracetamol' } });
+    const result = await screen.findByText(/Paracetamol/);
+    fireEvent.mouseDown(result);
+
     fireEvent.change(screen.getByLabelText(/Quantity Change/i), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: 'Found extra' } });
     
@@ -203,9 +208,15 @@ describe('StockView Component', () => {
 
     fireEvent.click(screen.getByText(/Initialize Stock/i));
     
-    // Select the "Medicine" label (it might match multiple, so we can be specific)
-    const medicineSelect = screen.getByLabelText('Medicine', { selector: 'select' });
-    fireEvent.change(medicineSelect, { target: { value: '2' } });
+    // Interact with the searchable Medicine input instead of standard select
+    const medicineInput = screen.getByLabelText('Medicine');
+    fireEvent.focus(medicineInput);
+    fireEvent.change(medicineInput, { target: { value: 'Paracetamol' } });
+    
+    // Wait for and click the dropdown result
+    const result = await screen.findByText(/Paracetamol/);
+    fireEvent.mouseDown(result);
+
     fireEvent.change(screen.getByLabelText(/Opening Quantity/i), { target: { value: '100' } });
     
     // Date is pre-filled
@@ -265,7 +276,13 @@ describe('StockView Component', () => {
 
     fireEvent.click(screen.getByText(/Adjust Stock/i));
     
-    fireEvent.change(screen.getByLabelText(/Medicine/i, { selector: 'select' }), { target: { value: '1' } });
+    // Search and select medicine
+    const medicineInput = screen.getByLabelText(/Medicine/i);
+    fireEvent.focus(medicineInput);
+    fireEvent.change(medicineInput, { target: { value: 'Paracetamol' } });
+    const result = await screen.findByText(/Paracetamol/);
+    fireEvent.mouseDown(result);
+
     fireEvent.change(screen.getByLabelText(/Quantity Change/i), { target: { value: '-5' } });
     fireEvent.change(screen.getByLabelText(/Reason/i), { target: { value: 'Damaged' } });
     
@@ -301,7 +318,14 @@ describe('StockView Component', () => {
     );
 
     fireEvent.click(screen.getByText(/Initialize Stock/i));
-    fireEvent.change(screen.getByLabelText('Medicine', { selector: 'select' }), { target: { value: '1' } });
+    
+    // Search and select medicine
+    const medicineInput = screen.getByLabelText('Medicine');
+    fireEvent.focus(medicineInput);
+    fireEvent.change(medicineInput, { target: { value: 'Paracetamol' } });
+    const result = await screen.findByText(/Paracetamol/);
+    fireEvent.mouseDown(result);
+
     fireEvent.change(screen.getByLabelText(/Opening Quantity/i), { target: { value: '100' } });
     fireEvent.click(screen.getByText(/Set Opening Balance/i));
 
