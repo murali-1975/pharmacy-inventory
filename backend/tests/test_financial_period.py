@@ -98,3 +98,61 @@ def test_period_summary_invalid_dates(client):
     tomorrow = today + timedelta(days=1)
     response = client.get(f"/financials/period-summary?start_date={tomorrow}&end_date={today}")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+def test_period_portfolio_batchless_reconciliation(client, db):
+    """
+    Test reconciliation with 'Batch-less' manual adjustments.
+    Story:
+    1. Start: 0 stock.
+    2. Mid: Manual Adjust +10 units (no batch).
+    3. Mid: Dispense 3 units.
+    Verify math: Open(0) + Added(250) - COGS(75) = Closing(175).
+    """
+    t1 = date.today() - timedelta(days=5) # Start
+    t2 = date.today() - timedelta(days=2) # Movements
+    t3 = date.today() # End
+    
+    # Medicine with unit_price = 25
+    med = models.Medicine(product_name="BatchlessMed", unit_price=25.0)
+    db.add(med)
+    db.flush()
+    
+    # Ensure a stock record exists
+    stock = models.MedicineStock(medicine_id=med.id, quantity_on_hand=7)
+    db.add(stock)
+
+    # 1. Manual Adjustment (+10) - NO BATCH
+    db.add(models.StockAdjustment(
+        medicine_id=med.id, quantity_change=10,
+        adjustment_type=models.StockAdjustmentType.MANUAL_ADJUSTMENT, reason="manual add",
+        adjusted_by_user_id=1, adjusted_at=datetime.combine(t2, datetime.min.time()).replace(tzinfo=timezone.utc)
+    ))
+
+    # 2. Dispensing (-3)
+    disp = models.Dispensing(
+        dispensed_date=t2, patient_name="B-Less Patient", medicine_id=med.id,
+        quantity=3, unit_price=50.0, total_amount=150.0, recorded_by_user_id=1
+    )
+    db.add(disp)
+    db.flush()
+    db.add(models.StockAdjustment(
+        medicine_id=med.id, quantity_change=-3,
+        adjustment_type=models.StockAdjustmentType.DISPENSED, reason="sale",
+        dispensing_id=disp.id, adjusted_by_user_id=1,
+        adjusted_at=datetime.combine(t2, datetime.min.time()).replace(tzinfo=timezone.utc)
+    ))
+
+    db.commit()
+
+    # Query
+    response = client.get(f"/financials/period-summary?start_date={t1}&end_date={t3}")
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Verifications
+    assert data["opening_valuation"] == 0.0
+    assert data["inventory_added"] == 250.0 # 10 * 25
+    assert data["cost_of_goods_sold"] == 75.0 # 3 * 25
+    assert data["closing_valuation"] == 175.0 # 250 - 75
+    assert data["revenue"] == 150.0
+    assert data["gross_profit"] == 75.0

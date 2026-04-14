@@ -38,22 +38,43 @@ def export_period_summary_excel(db: Session, summary: Dict[str, Any]) -> io.Byte
     return output
 
 def get_inventory_valuation(db: Session) -> Dict[str, Any]:
-    """Calculates the total financial value of all current stock."""
-    logger.info("Calculating total inventory valuation.")
-    stats = db.query(
+    """Calculates the total financial value of all current stock, including both batches and batch-less adjustments."""
+    logger.info("Calculating total inventory valuation (Comprehensive).")
+    
+    # 1. Valuation from identified batches
+    batch_stats = db.query(
         func.sum(models.StockBatch.quantity_on_hand * models.StockBatch.purchase_price).label("cost_val"),
         func.sum(models.StockBatch.quantity_on_hand * models.StockBatch.mrp).label("mrp_val"),
         func.count(func.distinct(models.StockBatch.medicine_id)).label("med_count"),
         func.count(models.StockBatch.id).label("batch_count")
     ).filter(models.StockBatch.quantity_on_hand > 0).first()
 
+    # 2. Valuation from "Batch-less" stock (Total Stock - Sum of Batch Stock)
+    # This captures stock increased via Manual Adjustments that didn't target a batch.
+    batch_sum_sub = db.query(
+        models.StockBatch.medicine_id,
+        func.sum(models.StockBatch.quantity_on_hand).label("sum_qty")
+    ).group_by(models.StockBatch.medicine_id).subquery()
+
+    batchless_stats = db.query(
+        func.sum(
+            func.max(0, models.MedicineStock.quantity_on_hand - func.coalesce(batch_sum_sub.c.sum_qty, 0)) * 
+            models.Medicine.unit_price
+        )
+    ).select_from(models.MedicineStock)\
+     .join(models.Medicine, models.MedicineStock.medicine_id == models.Medicine.id)\
+     .outerjoin(batch_sum_sub, models.MedicineStock.medicine_id == batch_sum_sub.c.medicine_id)\
+     .scalar() or 0.0
+
+    total_cost = float(batch_stats.cost_val or 0.0) + float(batchless_stats)
+    
     result = {
-        "total_cost_value": float(stats.cost_val or 0.0),
-        "total_mrp_value": float(stats.mrp_val or 0.0),
-        "medicine_count": int(stats.med_count or 0),
-        "batch_count": int(stats.batch_count or 0)
+        "total_cost_value": round(total_cost, 2),
+        "total_mrp_value": float(batch_stats.mrp_val or 0.0),
+        "medicine_count": int(batch_stats.med_count or 0),
+        "batch_count": int(batch_stats.batch_count or 0)
     }
-    logger.debug(f"Inventory Valuation Result: {result}")
+    logger.debug(f"Comprehensive Inventory Valuation Result: {result}")
     return result
 
 
@@ -198,13 +219,15 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
     # Closing is end of day, so we look at state as of (end_date + 1)
     closing_val = _get_valuation_at_date(db, end_date + timedelta(days=1))
 
-    # 3. Inventory Added (Invoices)
-    # Join with StockBatch to get the purchase_price for that specific receipt
+    # 3. Inventory Added (Invoices, Initializations, Manual Adds)
+    # We capture ANY positive movement to ensure the accounting math (Open + In - Out = Close) works.
     added_val = db.query(
-        func.sum(models.StockAdjustment.quantity_change * models.StockBatch.purchase_price)
-    ).select_from(models.StockAdjustment).join(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+        func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price))
+    ).select_from(models.StockAdjustment)\
+     .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
-         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.INVOICE_RECEIPT,
+         models.StockAdjustment.quantity_change > 0,
          func.date(models.StockAdjustment.adjusted_at) >= start_date,
          func.date(models.StockAdjustment.adjusted_at) <= end_date
      ).scalar() or 0.0
@@ -219,12 +242,14 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
     ).first()
     revenue = float(rev_data.revenue or 0.0)
 
-    # COGS is cost of items dispensed
+    # COGS is cost of items dispensed (or manually adjusted out)
     cogs_val = db.query(
-        func.sum(func.abs(models.StockAdjustment.quantity_change) * models.StockBatch.purchase_price)
-    ).select_from(models.StockAdjustment).join(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+        func.sum(func.abs(models.StockAdjustment.quantity_change) * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price))
+    ).select_from(models.StockAdjustment)\
+     .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
-         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.DISPENSED,
+         models.StockAdjustment.quantity_change < 0,
          func.date(models.StockAdjustment.adjusted_at) >= start_date,
          func.date(models.StockAdjustment.adjusted_at) <= end_date
      ).scalar() or 0.0
@@ -244,25 +269,25 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
 def _get_valuation_at_date(db: Session, target_date: date) -> float:
     """
     Internal helper to reconstruct stock valuation as of T (start of day).
-    Algorithm:
-    1. Start with current batch counts.
-    2. Subtract all adjustments that happened on or after target_date.
-    3. Multiply by each batch's purchase_price.
+    Algorithm: Valuation at T = (Total Current Valuation) - (Net Value change from adjustments after T)
+    This is mathematically robust for batches, manual adjustments, and initializations.
     """
-    # 1. Total adjustments per batch from target_date to NOW
-    adj_sub = db.query(
-        models.StockAdjustment.batch_id,
-        func.sum(models.StockAdjustment.quantity_change).label("net_adj")
-    ).filter(func.date(models.StockAdjustment.adjusted_at) >= target_date)\
-     .group_by(models.StockAdjustment.batch_id).subquery()
+    # 1. Total CURRENT valuation (at cost)
+    # Includes all batches + any batch-less stock quantity at master unit price
+    current_val = get_inventory_valuation(db)["total_cost_value"]
 
-    # 2. Current Batches joined with their future adjustments
-    # Point-in-time qty = current_qty - net_adj
-    query = db.query(
+    # 2. Total Value of all adjustments that happened from target_date to NOW
+    # Each adjustment's value is (qty_change * purchase_price_at_time)
+    future_value_change = db.query(
         func.sum(
-            (models.StockBatch.quantity_on_hand - func.coalesce(adj_sub.c.net_adj, 0)) * 
-            models.StockBatch.purchase_price
+            models.StockAdjustment.quantity_change * 
+            func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price)
         )
-    ).outerjoin(adj_sub, models.StockBatch.id == adj_sub.c.batch_id).scalar()
+    ).select_from(models.StockAdjustment)\
+     .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
+     .filter(func.date(models.StockAdjustment.adjusted_at) >= target_date)\
+     .scalar() or 0.0
 
-    return float(query or 0.0)
+    # Valuation then = Valuation now - Change since then
+    return float(current_val - future_value_change)
