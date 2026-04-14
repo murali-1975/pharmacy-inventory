@@ -127,6 +127,42 @@ describe('DispensingView', () => {
     });
   });
 
+  it('auto-fills master unit_price when batch MRP is 0 (Opening Stock)', async () => {
+    // temporarily inject master unit price
+    mockMedicines[0].unit_price = 210;
+    
+    globalThis.fetch.mockImplementation((url) => {
+      if (url.includes('/batches?active_only=true')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{
+            batch_no: 'OPENING-STOCK',
+            mrp: 0,
+            gst: 0
+          }]
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
+    });
+
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
+    
+    const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
+    fireEvent.focus(searchInput);
+    fireEvent.change(searchInput, { target: { value: 'Paracetamol' } });
+    
+    const option = await screen.findByText('Paracetamol (50)');
+    fireEvent.mouseDown(option);
+
+    await waitFor(() => {
+      // 210 with 10% discount from mockMedicines setting = 189
+      expect(screen.getByDisplayValue('189')).toBeInTheDocument();
+      // GST Fallback should be 5
+      expect(screen.getByDisplayValue('5')).toBeInTheDocument();
+      expect(screen.getByText(/Master Fallback: ₹210.00/i)).toBeInTheDocument();
+    });
+  });
+
   it('handles successful bulk save', async () => {
     // Mock for batch check and then post
     globalThis.fetch.mockImplementation((url) => {

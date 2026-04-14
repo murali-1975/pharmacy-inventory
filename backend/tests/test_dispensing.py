@@ -143,6 +143,30 @@ class TestRecordDispensing:
         res2 = client.get(f"/dispensing/price/{med.id}")
         assert res2.json()["unit_price"] == 10
 
+    def test_get_medicine_price_zero_mrp_fallback(self, client, db):
+        """If batch MRP is 0, it should fallback to Master unit_price and apply discount."""
+        med, stock = _seed_medicine(db)
+        
+        # Setup Master info
+        med.unit_price = 210.0
+        med.selling_price_percent = 5.0
+        db.commit()
+        
+        # Setup Batch with 0 MRP
+        batch = db.query(models.StockBatch).filter(models.StockBatch.medicine_id == med.id).first()
+        batch.mrp = 0.0
+        batch.gst = 0.0
+        db.commit()
+        
+        res = client.get(f"/dispensing/price/{med.id}")
+        assert res.status_code == 200
+        data = res.json()
+        
+        # Discount: 5% of 210 = 10.5 => subtract is 199.5 => rounded is 200
+        assert data["unit_price"] == 200
+        # GST Fallback must be 5.0
+        assert data["gst_percent"] == 5.0
+
     def test_record_dispensing_deducts_stock(self, client, db):
         """Dispensing should reduce MedicineStock.quantity_on_hand."""
         med, stock = _seed_medicine(db)

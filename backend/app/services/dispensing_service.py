@@ -25,18 +25,26 @@ class DispensingService:
         )
 
         if not best_batch:
-            return {"unit_price": medicine.unit_price or 0.0, "gst_percent": 0.0}
+            mrp = 0.0
+            gst = 0.0
+        else:
+            mrp = float(best_batch.mrp) or 0.0
+            gst = float(best_batch.gst) or 0.0
 
-        mrp = float(best_batch.mrp) or 0.0
+        master_price = float(medicine.unit_price) or 0.0
         sp_percent = float(medicine.selling_price_percent) or 0.0
         
-        calc_price = mrp
-        if mrp > 0:
-            calc_price = mrp - (mrp * (sp_percent / 100))
+        # Priority: Batch MRP > Master Unit Price
+        base_price = mrp if mrp > 0 else master_price
+        calc_price = base_price
         
+        if base_price > 0:
+            calc_price = base_price - (base_price * (sp_percent / 100))
+        
+        # Fallback GST requested by User is 5% if using Master Price
         return {
-            "unit_price": round(calc_price),
-            "gst_percent": float(best_batch.gst or 0.0)
+            "unit_price": float(round(calc_price)),
+            "gst_percent": gst if mrp > 0 else 5.0
         }
 
     @staticmethod

@@ -261,6 +261,9 @@ def cancel_dispensing(
             # 2. Break the link to dispensing record to satisfy ForeignKey constraint (fixes 409 Conflict)
             adj.dispensing_id = None
 
+        # Flush the updates to database so the upcoming DELETE doesn't violate Postgres constraints
+        db.flush()
+
         # 3. Restore master medicine stock total
         stock_record = (
             db.query(models.MedicineStock)

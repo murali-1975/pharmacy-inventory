@@ -394,15 +394,17 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
       try {
         const bestBatch = await fetchBestBatch(token, value);
         const medicineInfo = medicines.find(m => String(m.id) === String(value));
-        if (bestBatch) {
-          const mrp = parseFloat(bestBatch.mrp) || 0;
+        if (bestBatch || medicineInfo) {
+          const mrp = bestBatch ? (parseFloat(bestBatch.mrp) || 0) : 0;
+          const gst = bestBatch ? (parseFloat(bestBatch.gst) || 0) : 0;
+          const masterPrice = parseFloat(medicineInfo?.unit_price) || 0;
           const spPercent = parseFloat(medicineInfo?.selling_price_percent) || 0;
-          const purchasePrice = parseFloat(bestBatch.purchase_price) || 0;
           
-          let calcPrice = purchasePrice;
-          if (mrp > 0) {
-            // Apply selling_price_percent as a discount from MRP
-            calcPrice = mrp - (mrp * (spPercent / 100));
+          let basePrice = (mrp > 0) ? mrp : masterPrice;
+          let calcPrice = basePrice;
+          
+          if (basePrice > 0) {
+            calcPrice = basePrice - (basePrice * (spPercent / 100));
           }
           
           setRows((prev) => {
@@ -410,15 +412,11 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
             newRows[idx] = { 
               ...newRows[idx], 
               unit_price: Math.round(calcPrice).toString(),
-              gst_percent: parseFloat(bestBatch.gst) || 0,
-              batch_info: `Auto-batch: ${bestBatch.batch_no} (Exp: ${bestBatch.expiry_date}) | MRP: ₹${mrp.toFixed(2)} | Disc: ${spPercent}%`
+              gst_percent: (mrp > 0) ? gst : 5.0,
+              batch_info: bestBatch 
+                  ? `Auto-batch: ${bestBatch.batch_no} (Exp: ${bestBatch.expiry_date}) | ${mrp > 0 ? `MRP: ₹${mrp.toFixed(2)}` : `Master Fallback: ₹${masterPrice.toFixed(2)}`} | Disc: ${spPercent}%`
+                  : `No Batch! Master Fallback: ₹${masterPrice.toFixed(2)} | Disc: ${spPercent}%`
             };
-            return newRows;
-          });
-        } else {
-          setRows((prev) => {
-            const newRows = [...prev];
-            newRows[idx] = { ...newRows[idx], batch_info: "No stock available!" };
             return newRows;
           });
         }
