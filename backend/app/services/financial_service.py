@@ -7,7 +7,7 @@ import pandas as pd
 import io
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from app import models, schemas
 from app.core.logging_config import logger
 
@@ -58,15 +58,18 @@ def get_inventory_valuation(db: Session) -> Dict[str, Any]:
 
     batchless_stats = db.query(
         func.sum(
-            func.max(0, models.MedicineStock.quantity_on_hand - func.coalesce(batch_sum_sub.c.sum_qty, 0)) * 
-            models.Medicine.unit_price
+            case(
+                (models.MedicineStock.quantity_on_hand > func.coalesce(batch_sum_sub.c.sum_qty, 0),
+                 models.MedicineStock.quantity_on_hand - func.coalesce(batch_sum_sub.c.sum_qty, 0)),
+                else_=0
+            ) * func.coalesce(models.Medicine.unit_price, 0)
         )
     ).select_from(models.MedicineStock)\
      .join(models.Medicine, models.MedicineStock.medicine_id == models.Medicine.id)\
      .outerjoin(batch_sum_sub, models.MedicineStock.medicine_id == batch_sum_sub.c.medicine_id)\
      .scalar() or 0.0
 
-    total_cost = float(batch_stats.cost_val or 0.0) + float(batchless_stats)
+    total_cost = float(batch_stats.cost_val or 0.0) + float(batchless_stats or 0.0)
     
     result = {
         "total_cost_value": round(total_cost, 2),
@@ -222,7 +225,7 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
     # 3. Inventory Added (Invoices, Initializations, Manual Adds)
     # We capture ANY positive movement to ensure the accounting math (Open + In - Out = Close) works.
     added_val = db.query(
-        func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price))
+        func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
     ).select_from(models.StockAdjustment)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
      .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
@@ -244,7 +247,7 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
 
     # COGS is cost of items dispensed (or manually adjusted out)
     cogs_val = db.query(
-        func.sum(func.abs(models.StockAdjustment.quantity_change) * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price))
+        func.sum(func.abs(models.StockAdjustment.quantity_change) * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
     ).select_from(models.StockAdjustment)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
      .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
@@ -281,7 +284,7 @@ def _get_valuation_at_date(db: Session, target_date: date) -> float:
     future_value_change = db.query(
         func.sum(
             models.StockAdjustment.quantity_change * 
-            func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price)
+            func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0)
         )
     ).select_from(models.StockAdjustment)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
