@@ -533,6 +533,7 @@ def initialize_stock(
             reason=reason_text,
             batch_id=batch_record.id,
             adjusted_by_user_id=current_user.id,
+            adjusted_at=datetime.datetime.combine(init_in.initialized_date, datetime.time.min)
         )
         db.add(db_adjustment)
         db.commit()

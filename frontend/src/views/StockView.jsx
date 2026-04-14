@@ -744,6 +744,111 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
                   </button>
                 </div>
               </div>
+
+              {/* Stock Breakdown & History Panel */}
+              {selectedMedicine && (
+                <div style={styles.historyPanel}>
+                  <h3 style={styles.historyHeading}>
+                    📋 Stock Breakdown & History — {selectedMedicine.medicine?.product_name ?? `Medicine #${selectedMedicine.medicine_id}`}
+                  </h3>
+
+                  {/* Batch Breakdown Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#4A5568", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      📦 Active Batches (FEFO Order)
+                    </h4>
+                    {(!selectedMedicine.medicine?.batches || selectedMedicine.medicine.batches.length === 0) ? (
+                      <p style={styles.hint}>No active batches found for this medicine.</p>
+                    ) : (
+                      <div style={styles.tableWrapper}>
+                        <table style={styles.table}>
+                          <thead>
+                            <tr style={{ ...styles.tableHead, background: "#EDF2F7" }}>
+                              <th style={styles.th}>Batch No</th>
+                              <th style={styles.th}>Expiry Date</th>
+                              <th style={styles.th}>Purchase Price (₹)</th>
+                              <th style={styles.th}>Qty on Hand</th>
+                              <th style={styles.th}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedMedicine.medicine.batches
+                              .filter(b => b.quantity_on_hand > 0)
+                              .sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))
+                              .map((batch) => {
+                                const isExpired = new Date(batch.expiry_date) < new Date();
+                                const isNearExpiry = new Date(batch.expiry_date) < new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+                                return (
+                                  <tr key={batch.id} style={styles.row}>
+                                    <td style={styles.td}><strong>{batch.batch_no}</strong></td>
+                                    <td style={{ ...styles.td, color: isExpired ? "#C53030" : isNearExpiry ? "#B7791F" : "#2D3748", fontWeight: (isExpired || isNearExpiry) ? 700 : 400 }}>
+                                      {formatDate(batch.expiry_date)}
+                                      {isExpired && " (EXPIRED)"}
+                                      {!isExpired && isNearExpiry && " (Near Expiry)"}
+                                    </td>
+                                    <td style={styles.td}>₹{batch.purchase_price.toFixed(2)}</td>
+                                    <td style={{ ...styles.td, fontWeight: 700 }}>{batch.quantity_on_hand}</td>
+                                    <td style={styles.td}>
+                                      {isExpired ? (
+                                        <span style={{ ...styles.badge.outOfStock, fontSize: "11px" }}>Expired</span>
+                                      ) : isNearExpiry ? (
+                                        <span style={{ ...styles.badge.low, fontSize: "11px" }}>Near Expiry</span>
+                                      ) : (
+                                        <span style={{ ...styles.badge.normal, fontSize: "11px" }}>Good</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#4A5568", marginBottom: "12px" }}>
+                    📜 Adjustment History
+                  </h4>
+                  {historyLoading ? (
+                    <Spinner />
+                  ) : history.length === 0 ? (
+                    <p style={styles.hint}>No adjustments recorded yet.</p>
+                  ) : (
+                    <div style={styles.tableWrapper}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr style={styles.tableHead}>
+                            <th style={styles.th}>Date</th>
+                            <th style={styles.th}>Type</th>
+                            <th style={styles.th}>Change</th>
+                            <th style={styles.th}>Batch</th>
+                            <th style={styles.th}>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {history.map((adj) => (
+                            <tr key={adj.id} style={styles.row}>
+                              <td style={styles.td}>{formatDateTime(adj.adjusted_at)}</td>
+                              <td style={styles.td}><TypeBadge type={adj.adjustment_type} /></td>
+                              <td style={{ ...styles.td, ...(adj.quantity_change >= 0 ? styles.changePositive : styles.changeNegative) }}>
+                                {adj.quantity_change > 0 ? "+" : ""}{adj.quantity_change}
+                              </td>
+                              <td style={styles.td}>
+                                {adj.batch ? (
+                                  <span style={{ fontSize: "12px", color: "#4A5568", background: "#EDF2F7", padding: "2px 6px", borderRadius: "4px" }}>
+                                    {adj.batch.batch_no}
+                                  </span>
+                                ) : "—"}
+                              </td>
+                              <td style={styles.td}>{adj.reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -880,113 +985,6 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
           )}
         </div>
       )}
-
-      {/* Initialize Stock Tab */}
-          {selectedMedicine && (
-            <div style={styles.historyPanel}>
-              <h3 style={styles.historyHeading}>
-                📋 Stock Breakdown & History — {selectedMedicine.medicine?.product_name ?? `Medicine #${selectedMedicine.medicine_id}`}
-              </h3>
-
-              {/* Batch Breakdown Section */}
-              <div style={{ marginBottom: "28px" }}>
-                <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#4A5568", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  📦 Active Batches (FEFO Order)
-                </h4>
-                {(!selectedMedicine.medicine?.batches || selectedMedicine.medicine.batches.length === 0) ? (
-                  <p style={styles.hint}>No active batches found for this medicine.</p>
-                ) : (
-                  <div style={styles.tableWrapper}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr style={{ ...styles.tableHead, background: "#EDF2F7" }}>
-                          <th style={styles.th}>Batch No</th>
-                          <th style={styles.th}>Expiry Date</th>
-                          <th style={styles.th}>Purchase Price (₹)</th>
-                          <th style={styles.th}>Qty on Hand</th>
-                          <th style={styles.th}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedMedicine.medicine.batches
-                          .filter(b => b.quantity_on_hand > 0)
-                          .sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))
-                          .map((batch) => {
-                            const isExpired = new Date(batch.expiry_date) < new Date();
-                            const isNearExpiry = new Date(batch.expiry_date) < new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
-                            return (
-                              <tr key={batch.id} style={styles.row}>
-                                <td style={styles.td}><strong>{batch.batch_no}</strong></td>
-                                <td style={{ ...styles.td, color: isExpired ? "#C53030" : isNearExpiry ? "#B7791F" : "#2D3748", fontWeight: (isExpired || isNearExpiry) ? 700 : 400 }}>
-                                  {formatDate(batch.expiry_date)}
-                                  {isExpired && " (EXPIRED)"}
-                                  {!isExpired && isNearExpiry && " (Near Expiry)"}
-                                </td>
-                                <td style={styles.td}>₹{batch.purchase_price.toFixed(2)}</td>
-                                <td style={{ ...styles.td, fontWeight: 700 }}>{batch.quantity_on_hand}</td>
-                                <td style={styles.td}>
-                                  {isExpired ? (
-                                    <span style={{ ...styles.badge.outOfStock, fontSize: "11px" }}>Expired</span>
-                                  ) : isNearExpiry ? (
-                                    <span style={{ ...styles.badge.low, fontSize: "11px" }}>Near Expiry</span>
-                                  ) : (
-                                    <span style={{ ...styles.badge.normal, fontSize: "11px" }}>Good</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#4A5568", marginBottom: "12px" }}>
-                📜 Adjustment History
-              </h4>
-              {historyLoading ? (
-                <Spinner />
-              ) : history.length === 0 ? (
-                <p style={styles.hint}>No adjustments recorded yet.</p>
-              ) : (
-                <div style={styles.tableWrapper}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr style={styles.tableHead}>
-                        <th style={styles.th}>Date</th>
-                        <th style={styles.th}>Type</th>
-                        <th style={styles.th}>Change</th>
-                        <th style={styles.th}>Batch</th>
-                        <th style={styles.th}>Reason</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((adj) => (
-                        <tr key={adj.id} style={styles.row}>
-                          <td style={styles.td}>{formatDateTime(adj.adjusted_at)}</td>
-                          <td style={styles.td}><TypeBadge type={adj.adjustment_type} /></td>
-                          <td style={{ ...styles.td, ...(adj.quantity_change >= 0 ? styles.changePositive : styles.changeNegative) }}>
-                            {adj.quantity_change > 0 ? "+" : ""}{adj.quantity_change}
-                          </td>
-                          <td style={styles.td}>
-                            {adj.batch ? (
-                              <span style={{ fontSize: "12px", color: "#4A5568", background: "#EDF2F7", padding: "2px 6px", borderRadius: "4px" }}>
-                                {adj.batch.batch_no}
-                              </span>
-                            ) : "—"}
-                          </td>
-                          <td style={styles.td}>{adj.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Initialize Stock Tab (Admin only) */}
       {activeTab === "initialize" && userRole === "Admin" && (
         <div style={styles.formCard}>
           <h3 style={styles.formHeading}>Initialize Opening Stock Balance</h3>

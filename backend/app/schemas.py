@@ -405,6 +405,21 @@ class StockInitializeRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Optional remarks about this opening balance")
 
 
+class PeriodSummaryReport(BaseModel):
+    """
+    Consolidated financial statement for a specific date range.
+    Reconciles inventory movements and profitability.
+    """
+    opening_valuation: float = Field(..., description="Inventory value at the start of the period (at cost)")
+    inventory_added: float = Field(..., description="Value of stock received via purchase invoices in range")
+    revenue: float = Field(..., description="Total sales amount in the period")
+    cost_of_goods_sold: float = Field(..., description="Cost value of items sold in the period (FEFO cost)")
+    gross_profit: float = Field(..., description="Revenue - COGS")
+    closing_valuation: float = Field(..., description="Inventory value at the end of the period (at cost)")
+    start_date: datetime.date
+    end_date: datetime.date
+
+
 # --- Dispensing Schemas ---
 
 class DispensingCreate(BaseModel):

@@ -249,7 +249,9 @@ def update_invoice(id: int, invoice_in: schemas.InvoiceUpdate, db: Session = Dep
                         adjustment_type=models.StockAdjustmentType.INVOICE_RECEIPT,
                         reason=f"Invoice updated: {db_invoice.reference_number}",
                         invoice_line_item_id=db_item.id,
-                        adjusted_by_user_id=current_user.id
+                        batch_id=batch_record.id,
+                        adjusted_by_user_id=current_user.id,
+                        adjusted_at=datetime.combine(db_invoice.invoice_date, datetime.min.time())
                     )
                     db.add(adjustment)
         

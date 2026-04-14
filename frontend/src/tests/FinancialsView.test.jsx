@@ -38,6 +38,15 @@ describe('FinancialsView', () => {
     }
   ];
 
+  const mockPeriodSummary = {
+    opening_valuation: 10000,
+    inventory_added: 5000,
+    revenue: 3000,
+    cost_of_goods_sold: 2000,
+    gross_profit: 1000,
+    closing_valuation: 13000
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.fetch = vi.fn().mockImplementation((url) => {
@@ -45,6 +54,7 @@ describe('FinancialsView', () => {
       if (url.includes('/api/financials/aging')) return Promise.resolve({ ok: true, json: async () => mockAging });
       if (url.includes('/api/financials/gst')) return Promise.resolve({ ok: true, json: async () => mockGst });
       if (url.includes('/api/financials/profit')) return Promise.resolve({ ok: true, json: async () => mockProfit });
+      if (url.includes('/api/financials/period-summary')) return Promise.resolve({ ok: true, json: async () => mockPeriodSummary });
       return Promise.resolve({ ok: false, status: 404 });
     });
   });
@@ -104,6 +114,6 @@ describe('FinancialsView', () => {
     const refreshBtn = screen.getByTitle(/Refresh Data/i);
     fireEvent.click(refreshBtn);
     
-    expect(globalThis.fetch).toHaveBeenCalledTimes(8); // 4 initial + 4 refresh
+    expect(globalThis.fetch).toHaveBeenCalledTimes(10); // 5 initial + 5 refresh
   });
 });

@@ -128,6 +128,7 @@ class InvoiceService:
                     invoice_line_item_id=db_item.id,
                     batch_id=batch_record.id,
                     adjusted_by_user_id=user_id,
+                    adjusted_at=datetime.datetime.combine(invoice_in.invoice_date, datetime.time.min)
                 )
                 db.add(adjustment)
         
@@ -256,6 +257,7 @@ class InvoiceService:
                     invoice_line_item_id=db_item.id,
                     batch_id=batch_record.id,
                     adjusted_by_user_id=user_id,
+                    adjusted_at=datetime.datetime.combine(db_invoice.invoice_date, datetime.time.min)
                 )
                 db.add(adjustment)
 

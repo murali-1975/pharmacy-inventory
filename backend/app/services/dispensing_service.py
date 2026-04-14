@@ -88,7 +88,8 @@ class DispensingService:
                 quantity_change=-deduct_qty,
                 adjustment_type=models.StockAdjustmentType.DISPENSED,
                 reason=f"Dispensed to {dispensing_in.patient_name} (Bulk/Single)",
-                adjusted_by_user_id=user_id
+                adjusted_by_user_id=user_id,
+                adjusted_at=datetime.combine(dispensing_in.dispensed_date, datetime.min.time())
             )
             adjustments.append(adjustment)
             db.add(adjustment)

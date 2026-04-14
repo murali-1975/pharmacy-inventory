@@ -2,12 +2,40 @@
 Financial Service module.
 Handles business logic, complex data aggregation, and logging for financial reports.
 """
-from datetime import date
+from datetime import date, timedelta
+import pandas as pd
+import io
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app import models, schemas
 from app.core.logging_config import logger
+
+
+def export_period_summary_excel(db: Session, summary: Dict[str, Any]) -> io.BytesIO:
+    """
+    Generates an Excel spreadsheet for the period summary.
+    Includes the high-level movement statement and a timestamp.
+    """
+    logger.info(f"Generating Excel export for period summary: {summary['start_date']} to {summary['end_date']}")
+    
+    data = [
+        {"Description": "Opening Inventory Value", "Amount (₹)": summary["opening_valuation"]},
+        {"Description": "Inventory Value Added (+)", "Amount (₹)": summary["inventory_added"]},
+        {"Description": "Revenue from Goods Sold", "Amount (₹)": summary["revenue"]},
+        {"Description": "Cost of Goods Sold (-)", "Amount (₹)": summary["cost_of_goods_sold"]},
+        {"Description": "Gross Profit", "Amount (₹)": summary["gross_profit"]},
+        {"Description": "Closing Inventory Value", "Amount (₹)": summary["closing_valuation"]}
+    ]
+    
+    df = pd.DataFrame(data)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Period Portfolio Summary')
+        
+    output.seek(0)
+    return output
 
 def get_inventory_valuation(db: Session) -> Dict[str, Any]:
     """Calculates the total financial value of all current stock."""
@@ -146,3 +174,95 @@ def get_profit_summary(db: Session, start_date: date, end_date: date) -> List[Di
     sorted_result = sorted(result, key=lambda x: x["gross_profit"], reverse=True)
     logger.info(f"Profit summary calculated for {len(sorted_result)} medicines.")
     return sorted_result
+
+
+def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[str, Any]:
+    """
+    Calculates the 5-point movement statement for a given period.
+    Logic:
+    - Opening/Closing Valuation: Reconstructs batch state at T using audit trail.
+    - Inventory Added: Sum of INVOICE_RECEIPT adjustments at cost.
+    - Revenue: Sum of total_amount from Dispensing records.
+    - COGS: Sum of DISPENSED adjustments at cost.
+    """
+    if start_date > end_date:
+        logger.error(f"Invalid date range for period summary: {start_date} to {end_date}")
+        raise ValueError("start_date cannot be after end_date")
+
+    logger.info(f"Generating Period Portfolio Summary from {start_date} to {end_date}.")
+
+    # 1. Opening Valuation
+    opening_val = _get_valuation_at_date(db, start_date)
+
+    # 2. Closing Valuation
+    # Closing is end of day, so we look at state as of (end_date + 1)
+    closing_val = _get_valuation_at_date(db, end_date + timedelta(days=1))
+
+    # 3. Inventory Added (Invoices)
+    # Join with StockBatch to get the purchase_price for that specific receipt
+    added_val = db.query(
+        func.sum(models.StockAdjustment.quantity_change * models.StockBatch.purchase_price)
+    ).select_from(models.StockAdjustment).join(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .filter(
+         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.INVOICE_RECEIPT,
+         func.date(models.StockAdjustment.adjusted_at) >= start_date,
+         func.date(models.StockAdjustment.adjusted_at) <= end_date
+     ).scalar() or 0.0
+
+    # 4. Revenue & COGS
+    # Revenue is straight from Dispensing records
+    rev_data = db.query(
+        func.sum(models.Dispensing.total_amount).label("revenue")
+    ).filter(
+        models.Dispensing.dispensed_date >= start_date,
+        models.Dispensing.dispensed_date <= end_date
+    ).first()
+    revenue = float(rev_data.revenue or 0.0)
+
+    # COGS is cost of items dispensed
+    cogs_val = db.query(
+        func.sum(func.abs(models.StockAdjustment.quantity_change) * models.StockBatch.purchase_price)
+    ).select_from(models.StockAdjustment).join(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .filter(
+         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.DISPENSED,
+         func.date(models.StockAdjustment.adjusted_at) >= start_date,
+         func.date(models.StockAdjustment.adjusted_at) <= end_date
+     ).scalar() or 0.0
+
+    return {
+        "opening_valuation": float(opening_val),
+        "inventory_added": float(added_val),
+        "revenue": revenue,
+        "cost_of_goods_sold": float(cogs_val),
+        "gross_profit": revenue - float(cogs_val),
+        "closing_valuation": float(closing_val),
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+
+def _get_valuation_at_date(db: Session, target_date: date) -> float:
+    """
+    Internal helper to reconstruct stock valuation as of T (start of day).
+    Algorithm:
+    1. Start with current batch counts.
+    2. Subtract all adjustments that happened on or after target_date.
+    3. Multiply by each batch's purchase_price.
+    """
+    # 1. Total adjustments per batch from target_date to NOW
+    adj_sub = db.query(
+        models.StockAdjustment.batch_id,
+        func.sum(models.StockAdjustment.quantity_change).label("net_adj")
+    ).filter(func.date(models.StockAdjustment.adjusted_at) >= target_date)\
+     .group_by(models.StockAdjustment.batch_id).subquery()
+
+    # 2. Current Batches joined with their future adjustments
+    # Point-in-time qty = current_qty - net_adj
+    query = db.query(
+        func.sum(
+            (models.StockBatch.quantity_on_hand - func.coalesce(adj_sub.c.net_adj, 0)) * 
+            models.StockBatch.purchase_price
+        )
+    ).outerjoin(adj_sub, models.StockBatch.id == adj_sub.c.batch_id).scalar()
+
+    return float(query or 0.0)
