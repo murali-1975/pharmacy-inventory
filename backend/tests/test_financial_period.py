@@ -86,11 +86,13 @@ def test_period_portfolio_summary_reconciliation(client, db):
     # COGS: 10 * 10 = 100
     assert data["cost_of_goods_sold"] == 100.0
     
+    # Net Adjustments: None in this period
+    assert data["net_adjustments"] == 0.0
+
     # Profit: 250 - 100 = 150
     assert data["gross_profit"] == 150.0
     
-    # Closing: 1000 + 600 - 100 = 1500
-    # Or: (By batches) batch1(90*10=900) + batch2(50*12=600) = 1500
+    # Closing: 1000 + 600 - 100 + 0 = 1500
     assert data["closing_valuation"] == 1500.0
 
 def test_period_summary_invalid_dates(client):
@@ -106,7 +108,7 @@ def test_period_portfolio_batchless_reconciliation(client, db):
     1. Start: 0 stock.
     2. Mid: Manual Adjust +10 units (no batch).
     3. Mid: Dispense 3 units.
-    Verify math: Open(0) + Added(250) - COGS(75) = Closing(175).
+    Verify math: Open(0) + Added(0) - COGS(75) + NetAdj(250) = Closing(175).
     """
     t1 = date.today() - timedelta(days=5) # Start
     t2 = date.today() - timedelta(days=2) # Movements
@@ -151,8 +153,9 @@ def test_period_portfolio_batchless_reconciliation(client, db):
     
     # Verifications
     assert data["opening_valuation"] == 0.0
-    assert data["inventory_added"] == 250.0 # 10 * 25
+    assert data["inventory_added"] == 0.0
+    assert data["net_adjustments"] == 250.0 # 10 * 25
     assert data["cost_of_goods_sold"] == 75.0 # 3 * 25
-    assert data["closing_valuation"] == 175.0 # 250 - 75
+    assert data["closing_valuation"] == 175.0 # 0 + 0 - 75 + 250
     assert data["revenue"] == 150.0
     assert data["gross_profit"] == 75.0

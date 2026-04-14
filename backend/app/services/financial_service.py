@@ -222,20 +222,35 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
     # Closing is end of day, so we look at state as of (end_date + 1)
     closing_val = _get_valuation_at_date(db, end_date + timedelta(days=1))
 
-    # 3. Inventory Added (Invoices, Initializations, Manual Adds)
-    # We capture ANY positive movement to ensure the accounting math (Open + In - Out = Close) works.
+    # 3. Inventory Added (Invoices and Initializations ONLY)
     added_val = db.query(
         func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
     ).select_from(models.StockAdjustment)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
      .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
-         models.StockAdjustment.quantity_change > 0,
+         models.StockAdjustment.adjustment_type.in_([
+             models.StockAdjustmentType.INVOICE_RECEIPT,
+             models.StockAdjustmentType.OPENING_BALANCE
+         ]),
          func.date(models.StockAdjustment.adjusted_at) >= start_date,
          func.date(models.StockAdjustment.adjusted_at) <= end_date
      ).scalar() or 0.0
 
-    # 4. Revenue & COGS
+    # 4. Net Adjustments (Manual Adjustments, Expirations, Cancellations)
+    # This can be positive or negative.
+    net_adjustments_val = db.query(
+        func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
+    ).select_from(models.StockAdjustment)\
+     .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
+     .filter(
+         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.MANUAL_ADJUSTMENT,
+         func.date(models.StockAdjustment.adjusted_at) >= start_date,
+         func.date(models.StockAdjustment.adjusted_at) <= end_date
+     ).scalar() or 0.0
+
+    # 5. Revenue & COGS
     # Revenue is straight from Dispensing records
     rev_data = db.query(
         func.sum(models.Dispensing.total_amount).label("revenue")
@@ -245,14 +260,14 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
     ).first()
     revenue = float(rev_data.revenue or 0.0)
 
-    # COGS is cost of items dispensed (or manually adjusted out)
+    # COGS is cost of items dispensed ONLY
     cogs_val = db.query(
         func.sum(func.abs(models.StockAdjustment.quantity_change) * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
     ).select_from(models.StockAdjustment)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
      .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
-         models.StockAdjustment.quantity_change < 0,
+         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.DISPENSED,
          func.date(models.StockAdjustment.adjusted_at) >= start_date,
          func.date(models.StockAdjustment.adjusted_at) <= end_date
      ).scalar() or 0.0
@@ -262,6 +277,7 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
         "inventory_added": float(added_val),
         "revenue": revenue,
         "cost_of_goods_sold": float(cogs_val),
+        "net_adjustments": float(net_adjustments_val),
         "gross_profit": revenue - float(cogs_val),
         "closing_valuation": float(closing_val),
         "start_date": start_date,

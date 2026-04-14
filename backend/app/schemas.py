@@ -414,6 +414,7 @@ class PeriodSummaryReport(BaseModel):
     inventory_added: float = Field(..., description="Value of stock received via purchase invoices in range")
     revenue: float = Field(..., description="Total sales amount in the period")
     cost_of_goods_sold: float = Field(..., description="Cost value of items sold in the period (FEFO cost)")
+    net_adjustments: float = Field(..., description="Net value of system corrections (expirations, manual adjustments, cancellations)")
     gross_profit: float = Field(..., description="Revenue - COGS")
     closing_valuation: float = Field(..., description="Inventory value at the end of the period (at cost)")
     start_date: datetime.date

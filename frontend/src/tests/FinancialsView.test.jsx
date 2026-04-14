@@ -43,6 +43,7 @@ describe('FinancialsView', () => {
     inventory_added: 5000,
     revenue: 3000,
     cost_of_goods_sold: 2000,
+    net_adjustments: 0,
     gross_profit: 1000,
     closing_valuation: 13000
   };
@@ -115,5 +116,33 @@ describe('FinancialsView', () => {
     fireEvent.click(refreshBtn);
     
     expect(globalThis.fetch).toHaveBeenCalledTimes(10); // 5 initial + 5 refresh
+  });
+  
+  it('handles null financial values by defaulting to 0 without crashing', async () => {
+    // Mock response with null values (simulating medicines without price data)
+    const nullValuation = {
+      total_cost_value: null,
+      total_mrp_value: null,
+      batch_count: 0
+    };
+    
+    globalThis.fetch.mockImplementation((url) => {
+       if (url.includes('/api/financials/valuation')) return Promise.resolve({ ok: true, json: async () => nullValuation });
+       if (url.includes('/api/financials/profit') || url.includes('/api/financials/aging')) {
+         return Promise.resolve({ ok: true, json: async () => [] });
+       }
+       return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    await React.act(async () => {
+      render(<FinancialsView token={mockToken} />);
+    });
+    
+    await waitFor(() => expect(screen.queryByText(/Crunching financial data/i)).not.toBeInTheDocument());
+
+    // Should display ₹0 instead of ₹undefined
+    const costCards = screen.getAllByText('₹0');
+    expect(costCards.length).toBeGreaterThan(0);
+    expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
   });
 });

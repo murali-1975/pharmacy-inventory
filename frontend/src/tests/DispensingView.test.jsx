@@ -381,6 +381,33 @@ describe('DispensingView', () => {
     });
   });
 
+  it('handles cancellation failure (e.g. 409 Conflict) gracefully', async () => {
+    // Mock for failed delete
+    globalThis.fetch.mockImplementation((url, options) => {
+      if (options?.method === 'DELETE') {
+        return Promise.resolve({ 
+          ok: false, 
+          status: 409,
+          json: async () => ({ detail: 'Cannot delete: record is linked' }) 
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ items: [{ id: 50, dispensed_date: '2024-04-10', patient_name: 'Test', medicine: { product_name: 'Paracetamol' }, quantity: 1, total_amount: 10, status: 'Active' }], total: 1 }) });
+    });
+    
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
+    
+    fireEvent.click(screen.getByText(/Dispensing History/i));
+    fireEvent.click(screen.getByText('🔍 Search'));
+
+    const cancelBtn = await screen.findByText(/Cancel/i);
+    fireEvent.click(cancelBtn);
+
+    expect(await screen.findByText(/Cannot delete: record is linked/i)).toBeInTheDocument();
+    expect(mockOnRefresh).not.toHaveBeenCalled();
+  });
+
   it('triggers onUnauthorized when API returns 401', async () => {
     const mockUnauthorized = vi.fn();
     
