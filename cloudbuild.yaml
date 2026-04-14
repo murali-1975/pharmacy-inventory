@@ -1,0 +1,116 @@
+# ==============================================================================
+# Pharmacy Inventory System - Cloud Build CI/CD Pipeline
+# 
+# This configuration automates:
+# 1. Running backend unit tests
+# 2. Building Docker images for Backend and Frontend
+# 3. Pushing images to Artifact Registry (asia-south1)
+# 4. Deploying/Updating Cloud Run services
+# ==============================================================================
+
+steps:
+  # 1. Run Backend Unit Tests
+  # We use the python builder to ensure the code passes before imaging.
+  - name: 'python:3.11'
+    id: 'test-backend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install --no-cache-dir -r backend/requirements.txt
+        export PYTHONPATH=$$PYTHONPATH:$$(pwd)/backend
+        export SECRET_KEY="build-validation-key"
+        export DATABASE_URL="sqlite:///:memory:"
+        python -m pytest backend/tests -v
+
+  # 2. Build Backend Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args: [
+      'build', 
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA',
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:latest',
+      './backend'
+    ]
+    waitFor: ['test-backend']
+
+  # 3. Build Frontend Image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend'
+    args: [
+      'build', 
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA',
+      '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:latest',
+      './frontend'
+    ]
+    waitFor: ['test-backend']
+
+  # 4. Push Backend Images
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend', '--all-tags']
+    waitFor: ['build-backend']
+
+  # 5. Push Frontend Images
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend'
+    args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend', '--all-tags']
+    waitFor: ['build-frontend']
+
+  # 6. Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-backend'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pharmacy-backend'
+      - '--image'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
+      - '--region'
+      - '$_REGION'
+      - '--set-secrets'
+      - 'DATABASE_URL=PHARMACY_DB_URL:latest,SECRET_KEY=PHARMACY_SECRET_KEY:latest'
+      - '--add-cloudsql-instances'
+      - '$PROJECT_ID:$_REGION:$_DB_INSTANCE'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8000'
+    waitFor: ['push-backend']
+
+  # 7. Deploy Frontend to Cloud Run
+  # Note: This step dynamically discovers the Backend URL for true automation.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔍 Discovering Backend URL..."
+        B_URL=$$(gcloud run services describe pharmacy-backend --region $_REGION --format='value(status.url)')
+        if [ -z "$$B_URL" ]; then echo "❌ Error: Could not find backend URL"; exit 1; fi
+        echo "✅ Detected Backend URL: $$B_URL"
+        
+        gcloud run deploy pharmacy-frontend \
+          --image "$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA" \
+          --region "$_REGION" \
+          --update-env-vars "BACKEND_URL=$$B_URL" \
+          --allow-unauthenticated \
+          --port 80
+    waitFor: ['push-frontend', 'deploy-backend']
+
+# Images to be tracked in the build history
+images:
+  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
+  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA'
+
+# Default substitutions (can be overridden in the Trigger console)
+substitutions:
+  _REGION: 'asia-south1'
+  _REPO_NAME: 'pharmacy-app'
+  _DB_INSTANCE: 'pharmacy-db-mumbai'
+  _COMMIT_SHA: 'latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8' # Faster builds
+  logging: CLOUD_LOGGING_ONLY

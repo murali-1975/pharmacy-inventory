@@ -6,10 +6,15 @@
 # This script automates the setup and deployment of the Pharmacy Inventory app
 # on GCP using Cloud Run, Cloud SQL, and Secret Manager in asia-south1.
 # 
+# 
 # Prerequisites:
 # 1. GCloud CLI installed and authenticated (gcloud auth login)
 # 2. Billing enabled for the project
 # 3. Project ID known
+# 
+# NOTE: This script is for initial infrastructure setup. For continuous 
+# integration and subsequent deployments, use the 'cloudbuild.yaml' 
+# via 'gcloud builds submit' or a Git Trigger.
 # ==============================================================================
 
 # Set strict error handling

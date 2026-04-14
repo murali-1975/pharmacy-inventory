@@ -43,6 +43,8 @@ frontend/dist/
 
 *.log
 *.txt
+!requirements.txt
+!backend/requirements.txt
 backend/test_pharmacy_inventory.db
 test_*.db
 current_changes.diff
