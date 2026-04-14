@@ -246,7 +246,22 @@ def cancel_dispensing(
                 detail=f"Dispensing record with ID {dispensing_id} not found.",
             )
 
-        # Restore stock
+        # 1. Restore quantity to original batches (if batches exist)
+        # This fixes the bug where stock was only restored to the global total.
+        original_adjustments = db.query(models.StockAdjustment).filter(
+            models.StockAdjustment.dispensing_id == dispensing_id
+        ).all()
+        
+        for adj in original_adjustments:
+            if adj.batch_id:
+                batch = db.query(models.StockBatch).filter(models.StockBatch.id == adj.batch_id).first()
+                if batch:
+                    batch.quantity_on_hand += abs(adj.quantity_change)
+            
+            # 2. Break the link to dispensing record to satisfy ForeignKey constraint (fixes 409 Conflict)
+            adj.dispensing_id = None
+
+        # 3. Restore master medicine stock total
         stock_record = (
             db.query(models.MedicineStock)
             .filter(models.MedicineStock.medicine_id == record.medicine_id)
@@ -256,7 +271,7 @@ def cancel_dispensing(
             stock_record.quantity_on_hand += record.quantity
             stock_record.last_updated_at = datetime.datetime.now(datetime.timezone.utc)
 
-        # Write reversal audit record
+        # 4. Write reversal audit record
         reversal = models.StockAdjustment(
             medicine_id=record.medicine_id,
             quantity_change=record.quantity,
@@ -265,6 +280,8 @@ def cancel_dispensing(
             adjusted_by_user_id=current_user.id,
         )
         db.add(reversal)
+        
+        # 5. Delete the dispensing record
         db.delete(record)
         db.commit()
 

@@ -291,18 +291,27 @@ class TestGetDispensing:
 
 class TestCancelDispensing:
     def test_cancel_restores_stock(self, client, db):
-        """Admin DELETE should restore deducted stock."""
+        """Admin DELETE should restore deducted stock to both total and batch levels."""
         med, stock = _seed_medicine(db)
-        initial_qty = stock.quantity_on_hand
+        batch = db.query(models.StockBatch).filter(models.StockBatch.medicine_id == med.id).first()
+        
+        initial_total = stock.quantity_on_hand
+        initial_batch = batch.quantity_on_hand
 
         create_resp = client.post("/dispensing/", json=_dispense_payload(med.id, quantity=5))
         dispensing_id = create_resp.json()["id"]
+        
         db.refresh(stock)
-        assert stock.quantity_on_hand == initial_qty - 5
+        db.refresh(batch)
+        assert stock.quantity_on_hand == initial_total - 5
+        assert batch.quantity_on_hand == initial_batch - 5
 
         client.delete(f"/dispensing/{dispensing_id}")
+        
         db.refresh(stock)
-        assert stock.quantity_on_hand == initial_qty  # restored
+        db.refresh(batch)
+        assert stock.quantity_on_hand == initial_total  # total restored
+        assert batch.quantity_on_hand == initial_batch  # batch restored
 
     def test_cancel_removes_record(self, client, db):
         """Deleted dispensing record should not be retrievable."""
