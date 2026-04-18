@@ -79,31 +79,42 @@ class DispensingService:
             .all()
         )
 
-        if not active_batches and remaining > 0:
-            raise HTTPException(status_code=400, detail=f"No active batches found for {medicine.product_name}")
-
         adjustments = []
+        
+        # A. Deduct from available batches first
         for batch in active_batches:
             if remaining <= 0: break
             deduct_qty = min(remaining, batch.quantity_on_hand)
             batch.quantity_on_hand -= deduct_qty
             remaining -= deduct_qty
 
-            # Audit record (don't add to DB yet, collect in list)
             adjustment = models.StockAdjustment(
                 medicine_id=medicine.id,
                 batch_id=batch.id,
                 quantity_change=-deduct_qty,
                 adjustment_type=models.StockAdjustmentType.DISPENSED,
-                reason=f"Dispensed to {dispensing_in.patient_name} (Bulk/Single)",
+                reason=f"Dispensed to {dispensing_in.patient_name} (FEFO Batch)",
                 adjusted_by_user_id=user_id,
                 adjusted_at=datetime.combine(dispensing_in.dispensed_date, datetime.min.time())
             )
             adjustments.append(adjustment)
             db.add(adjustment)
 
+        # B. Fallback: If no batches exist but total stock is sufficient, allow unbatched deduction
         if remaining > 0:
-            raise HTTPException(status_code=400, detail=f"Insufficient batch stock for {medicine.product_name}")
+            logger.warning(f"Deducting {remaining} units for {medicine.product_name} without active batch records.")
+            adjustment = models.StockAdjustment(
+                medicine_id=medicine.id,
+                batch_id=None, # Explicitly unbatched
+                quantity_change=-remaining,
+                adjustment_type=models.StockAdjustmentType.DISPENSED,
+                reason=f"Dispensed to {dispensing_in.patient_name} (Unbatched Fallback)",
+                adjusted_by_user_id=user_id,
+                adjusted_at=datetime.combine(dispensing_in.dispensed_date, datetime.min.time())
+            )
+            adjustments.append(adjustment)
+            db.add(adjustment)
+            remaining = 0
 
         # 4. Update core stock
         stock_record.quantity_on_hand -= dispensing_in.quantity

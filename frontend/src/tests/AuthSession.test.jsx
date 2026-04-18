@@ -67,14 +67,22 @@ describe('Session Timeout Handling', () => {
     api.getSupplierTypes.mockResolvedValue([]);
 
     // Mock global fetch for analytics endpoints or other direct calls
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        total_medicines: 10,
-        pending_invoices_amount: 5000,
-        monthly_procurement: 1200,
-        low_stock_alerts: 2
-      })
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/stock/')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [], total: 0 })
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          total_medicines: 10,
+          pending_invoices_amount: 5000,
+          monthly_procurement: 1200,
+          low_stock_alerts: 2
+        })
+      });
     });
   });
 

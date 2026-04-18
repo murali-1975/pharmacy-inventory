@@ -115,6 +115,40 @@ class TestRecordDispensing:
         assert res_down.status_code == 201
         assert res_down.json()["total_amount"] == 104
 
+    def test_record_dispensing_no_batches_fallback(self, client, db):
+        """Should succeed even if no batches exist, provided total stock is enough."""
+        med = models.Medicine(
+            product_name="No Batch Med",
+            generic_name="Generic",
+            category=models.MedicineCategory.GENERAL,
+            uom="Tablet",
+        )
+        db.add(med)
+        db.commit()
+        db.refresh(med)
+
+        # Seed stock but NO batches
+        stock = models.MedicineStock(medicine_id=med.id, quantity_on_hand=50, reorder_level=5)
+        db.add(stock)
+        db.commit()
+
+        payload = _dispense_payload(med.id, quantity=10)
+        response = client.post("/dispensing/", json=payload)
+        
+        assert response.status_code == 201
+        
+        # Verify stock was deducted
+        db.refresh(stock)
+        assert stock.quantity_on_hand == 40
+        
+        # Verify an unbatched adjustment was created
+        adj = db.query(models.StockAdjustment).filter(
+            models.StockAdjustment.medicine_id == med.id,
+            models.StockAdjustment.batch_id == None
+        ).first()
+        assert adj is not None
+        assert "Unbatched" in adj.reason
+
     def test_get_medicine_price_rounding(self, client, db):
         """The /price/{id} endpoint should return a rounded unit price."""
         med, stock = _seed_medicine(db)

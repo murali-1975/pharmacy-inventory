@@ -210,6 +210,45 @@ describe('DispensingView', () => {
     expect(mockOnRefresh).toHaveBeenCalled();
   });
 
+  it('handles successful save even with no batches found (Unbatched Fallback)', async () => {
+    // Mock for medicine selection (No batches)
+    globalThis.fetch.mockImplementation((url) => {
+      if (url.includes('/batches?active_only=true')) {
+        return Promise.resolve({ ok: true, json: async () => [] }); // Empty batches
+      }
+      if (url.endsWith('/dispensing/')) {
+        return Promise.resolve({ ok: true, json: async () => ({ id: 102 }) }); // Successful save
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
+    });
+
+    render(<DispensingView medicines={mockMedicines} onRefreshMedicines={mockOnRefresh} token={mockToken} userRole={mockUserRole} />);
+    
+    // Fill patient name
+    fireEvent.change(screen.getByLabelText(/Patient Name/i), { target: { value: 'Fallback User' } });
+    
+    // Select medicine
+    const searchInput = screen.getByPlaceholderText(/Search medicine\.\.\./i);
+    fireEvent.focus(searchInput);
+    fireEvent.change(searchInput, { target: { value: 'Paracetamol' } });
+    const option = await screen.findByText('Paracetamol (50)');
+    fireEvent.mouseDown(option);
+
+    // Verify "No Batch" warning appears (visual check)
+    expect(await screen.findByText(/No Batch!/i)).toBeInTheDocument();
+
+    // Fill quantity
+    const qtyInput = screen.getAllByPlaceholderText('0')[0];
+    fireEvent.change(qtyInput, { target: { value: '5' } });
+
+    // Save
+    fireEvent.click(screen.getByText(/Save All/i));
+
+    // Should succeed now
+    expect(await screen.findByText(/All 1 dispensing entries saved/i)).toBeInTheDocument();
+    expect(mockOnRefresh).toHaveBeenCalled();
+  });
+
   it('switches to history tab and loads records', async () => {
     const mockHistory = {
       items: [
