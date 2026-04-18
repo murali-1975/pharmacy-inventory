@@ -15,13 +15,18 @@ export const SidebarItem = ({ icon: Icon, label, active = false, onClick, isOpen
   </div>
 );
 
-export const StatCard = ({ icon: Icon, label, value, trend, color, subValue }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+export const StatCard = ({ icon: Icon, label, value, trend, color, subValue, onClick }) => (
+  <div 
+    onClick={onClick}
+    className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all duration-200 ${
+      onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] border-blue-50' : ''
+    }`}
+  >
     <div className="flex justify-between items-start mb-4">
       <div className={`p-3 rounded-lg ${color} bg-opacity-10 text-blue-600`}>
         <Icon size={24} />
       </div>
-      {trend && (
+      {trend !== undefined && (
         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
           trend > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
         }`}>

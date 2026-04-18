@@ -11,6 +11,8 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
     low_stock_alerts: 0
   });
   const [loading, setLoading] = useState(true);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [lowStockLoading, setLowStockLoading] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -39,6 +41,75 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
       fetchStats();
     }
   }, [token]);
+
+  useEffect(() => {
+    const fetchLowStock = async () => {
+      setLowStockLoading(true);
+      try {
+        const response = await fetch('/api/stock/?low_stock_only=true&limit=5', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.status === 401) {
+          onUnauthorized();
+          return;
+        }
+        if (response.ok) {
+          const data = await response.json();
+          setLowStockItems(data.items);
+        }
+      } catch (error) {
+        console.error("Failed to fetch low stock items:", error);
+      } finally {
+        setLowStockLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchLowStock();
+    }
+  }, [token, onUnauthorized]);
+
+  const handleExportCSV = async () => {
+    try {
+      const response = await fetch('/api/stock/?low_stock_only=true&limit=5000', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const items = data.items;
+        
+        // Header
+        let csvContent = "Product Name,Generic Name,Category,Quantity on Hand,Reorder Level,UOM\n";
+        
+        // Rows
+        items.forEach(item => {
+          const row = [
+            `"${item.medicine?.product_name || ''}"`,
+            `"${item.medicine?.generic_name || ''}"`,
+            `"${item.medicine?.category || ''}"`,
+            item.quantity_on_hand,
+            item.reorder_level || 0,
+            `"${item.medicine?.uom || ''}"`
+          ].join(",");
+          csvContent += row + "\n";
+        });
+
+        // Trigger download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Low_Stock_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error("CSV Export failed:", error);
+    }
+  };
 
   const recentInvoices = invoices.slice(0, 5);
   
@@ -83,6 +154,14 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
         value={(stats?.low_stock_alerts ?? 0).toString()} 
         trend={-2} 
         color="bg-orange-500" 
+        onClick={() => {
+          const element = document.getElementById('low-stock-section');
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+            element.classList.add('ring-2', 'ring-blue-400');
+            setTimeout(() => element.classList.remove('ring-2', 'ring-blue-400'), 2000);
+          }
+        }}
       />
     </div>
 
@@ -123,23 +202,66 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
         </div>
       </div>
 
-      <div className="bg-blue-600 p-6 rounded-2xl shadow-xl shadow-blue-100 text-white relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-lg font-bold mb-2">Quick Actions</h2>
-          <p className="text-blue-100 text-sm mb-6">Manage your pharmacy inventory efficiently.</p>
-          <div className="space-y-3">
-            <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl font-semibold transition-colors flex items-center justify-center space-x-2">
-              <span>Add New Product</span>
+      <div id="low-stock-section" className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all duration-500">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Low Stock Items</h2>
+            <p className="text-xs text-gray-500 mt-1">Items requiring immediate reorder</p>
+          </div>
+          <div className="flex flex-col items-end space-y-2">
+            <button 
+              onClick={() => setView('stock')}
+              className="text-xs text-blue-600 font-bold hover:underline"
+            >
+              View All
             </button>
             <button 
-              onClick={() => setView('suppliers')}
-              className="w-full bg-white text-blue-600 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-blue-700/20"
+              onClick={handleExportCSV}
+              className="text-xs text-green-600 font-bold hover:underline flex items-center space-x-1"
             >
-              Manage Suppliers
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
-        <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+
+        <div className="space-y-3">
+          {lowStockLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            </div>
+          ) : lowStockItems.length > 0 ? (
+            lowStockItems.map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                    <AlertCircle size={14} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 leading-none">
+                      {item.medicine?.product_name}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                      {item.medicine?.category}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-red-600 leading-none">
+                    {item.quantity_on_hand}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Threshold: {item.reorder_level}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <Package className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Inventory is healthy.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   </>

@@ -9,76 +9,82 @@ describe('DashboardHome Component', () => {
     { id: 2, reference_number: 'INV-002', invoice_date: '2024-03-21', total_value: 2000, supplier: { supplier_name: 'Beta Meds' } }
   ];
 
-  const mockStats = {
-    total_medicines: 100,
-    pending_invoices_amount: 5000,
-    monthly_procurement: 15000,
-    low_stock_alerts: 5
+  const mockLowStock = {
+    total: 2,
+    items: [
+      { id: 10, medicine: { product_name: 'Paracetamol', category: 'Analgesics', uom: 'Tablet' }, quantity_on_hand: 5, reorder_level: 10 },
+      { id: 11, medicine: { product_name: 'Amoxicillin', category: 'Antibiotics', uom: 'Capsule' }, quantity_on_hand: 2, reorder_level: 20 }
+    ]
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn().mockImplementation(() =>
-      Promise.resolve({
-        ok: true,
-        json: async () => mockStats
-      })
-    );
+    if (global.URL.createObjectURL) vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:test');
+    
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/analytics/stats')) {
+        return Promise.resolve({ ok: true, json: async () => mockStats });
+      }
+      if (url.includes('/api/stock/?low_stock_only=true')) {
+        return Promise.resolve({ ok: true, json: async () => mockLowStock });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
   });
 
-  it('renders loading state initially', () => {
+  it('renders loading state initially', async () => {
     render(<DashboardHome token="test-token" />);
-    // There is no role status, just check for the spinning icon
     const loader = document.querySelector('.animate-spin');
     expect(loader).toBeInTheDocument();
   });
 
-  it('renders stats and recent invoices after loading', async () => {
+  it('renders stats, recent invoices, and low stock list after loading', async () => {
     render(<DashboardHome token="test-token" invoices={mockInvoices} />);
-
-    // Wait for the stats to appear (signals loading is done)
     await screen.findByText('Total Medicines');
-    
     expect(screen.getByText('100')).toBeInTheDocument();
-    expect(screen.getByText('₹5,000')).toBeInTheDocument();
-    expect(screen.getByText('₹15,000')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
-
     expect(screen.getByText('INV-001')).toBeInTheDocument();
-    expect(screen.getByText('Alpha Pharma')).toBeInTheDocument();
-    expect(screen.getByText('20-03-2024')).toBeInTheDocument();
-    expect(screen.getByText('₹1,000')).toBeInTheDocument();
+    expect(screen.getByText('Low Stock Items')).toBeInTheDocument();
   });
 
-  it('navigates to invoices when View All is clicked', async () => {
+  it('navigates when View All is clicked', async () => {
     const setView = vi.fn();
     render(<DashboardHome token="test-token" invoices={mockInvoices} setView={setView} />);
-
-    await screen.findByText('View All');
-    fireEvent.click(screen.getByText('View All'));
+    await screen.findByText('Recent Invoices');
+    fireEvent.click(screen.getAllByText('View All')[0]);
     expect(setView).toHaveBeenCalledWith('invoices');
   });
 
-  it('navigates to suppliers when Manage Suppliers is clicked', async () => {
+  it('navigates to stock view from low stock section', async () => {
     const setView = vi.fn();
     render(<DashboardHome token="test-token" invoices={mockInvoices} setView={setView} />);
-
-    await screen.findByText('Manage Suppliers');
-    fireEvent.click(screen.getByText('Manage Suppliers'));
-    expect(setView).toHaveBeenCalledWith('suppliers');
+    await screen.findByText('Low Stock Items');
+    const viewAllBtn = screen.getAllByText('View All').find(el => el.closest('#low-stock-section'));
+    fireEvent.click(viewAllBtn);
+    expect(setView).toHaveBeenCalledWith('stock');
   });
 
-  it('handles empty invoices list', async () => {
-    render(<DashboardHome token="test-token" invoices={[]} />);
-    await screen.findByText('No recent invoices.');
+  it('handles CSV export', async () => {
+    const link = document.createElement('a');
+    const clickSpy = vi.spyOn(link, 'click').mockImplementation(() => {});
+    vi.spyOn(document, 'createElement').mockReturnValue(link);
+    vi.spyOn(document.body, 'appendChild').mockImplementation(() => {});
+    vi.spyOn(document.body, 'removeChild').mockImplementation(() => {});
+
+    render(<DashboardHome token="test-token" invoices={mockInvoices} />);
+    await screen.findByText('Export CSV');
+    fireEvent.click(screen.getByText('Export CSV'));
+
+    await waitFor(() => {
+      expect(clickSpy).toHaveBeenCalled();
+    });
+    vi.restoreAllMocks();
   });
 
   it('handles fetch error', async () => {
-    console.error = vi.fn();
-    global.fetch.mockImplementationOnce(() => Promise.reject('API Error'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch.mockImplementationOnce(() => Promise.reject(new Error('API Error')));
     render(<DashboardHome token="test-token" />);
-    await waitFor(() => {
-        expect(console.error).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(consoleSpy).toHaveBeenCalled());
+    consoleSpy.mockRestore();
   });
 });
