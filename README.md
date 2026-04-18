@@ -9,7 +9,8 @@ pharmacy-inventory/
 ├── backend/                    # FastAPI application
 │   ├── app/
 │   │   ├── core/              # Config and logging setup
-│   │   ├── routers/           # API route handlers (9 modules)
+│   │   ├── routers/           # API route handlers
+│   │   ├── services/          # Core business logic layer
 │   │   ├── main.py            # App entrypoint, middleware, lifespan
 │   │   ├── models.py          # SQLAlchemy ORM models
 │   │   ├── schemas.py         # Pydantic request/response schemas
@@ -87,13 +88,14 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 ## Core Features
 
 1. **Medicine Inventory Management** — Comprehensive tracking of medicines, brands, categories, and manufacturers.
-2. **Medicine Dispensing Module** — High-performance interface for daily patient-wise medicine distribution with atomic stock deduction and full audit trail.
-3. **Supplier Management (V2)** — Granular normalized schema: address, contact details, and multiple bank accounts per supplier.
-4. **Invoice Workflow** — Digital procurement workflow: create invoices → add line items → auto-increment stock → record payments → auto-settle.
-5. **Stock Tracking** — Intelligent stock ledger with audit trail for every change (invoice receipts, manual adjustments, dispensing, write-offs, opening balance).
-6. **Lookup Management** — Soft-delete policy for system statuses and supplier types; Admin-controlled.
-7. **RBAC** — Role-based access: Admin, Manager, Staff with endpoint-level guards.
-8. **Logging & Observability** — Automated request/response logging middleware with timed file rotation and unified database error handling (auto-rollback & clean HTTP mapping).
+2. **Medicine Dispensing Module** — High-performance interface for daily patient-wise medicine distribution with **FEFO** (First Expiring, First Out) logic and price fallbacks.
+3. **Financial Reporting** — Asset valuation, GST reconciliation (Input vs Output), Supplier aging, and medicine-wise profit margin tracking.
+4. **Dashboard Analytics** — Real-time KPIs for low stock alerts, monthly procurement totals, and revenue trends.
+5. **Supplier Management (V2)** — Granular normalized schema: address, contact details, and multiple bank accounts per supplier.
+6. **Invoice Workflow** — Digital procurement workflow: create invoices → add line items → auto-increment stock → record payments → auto-settle.
+7. **Stock Tracking** — Intelligent stock ledger with audit trail for every change (invoice receipts, manual adjustments, dispensing, write-offs, opening balance).
+8. **RBAC** — Role-based access: Admin, Manager, Staff with endpoint-level guards.
+9. **Unified Error Handling** — Automated database error handlers with auto-rollback and structured HTTP error mapping.
 
 ---
 
@@ -105,11 +107,13 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 | Suppliers      | `/suppliers`      | GET, POST, PUT, DELETE                                                     |
 | Medicines      | `/medicines`      | GET, POST, PUT, DELETE                                                     |
 | Manufacturers  | `/manufacturers`  | GET, POST, PUT, DELETE                                                     |
-| Invoices       | `/invoices`       | GET (paginated, searchable), POST, PUT, DELETE; `/payments` sub-resource   |
-| Stock          | `/stock`          | GET (all/filtered), GET `/{id}`, GET `/{id}/adjustments`, POST `/adjust`, POST `/initialize`, GET `/adjustments` |
-| Dispensing     | `/dispensing`     | GET (paginated, filterable), POST, GET `/{id}`, DELETE (Admin cancel)      |
-| Lookups        | `/lookups`        | `/status`, `/supplier-types` with full CRUD + soft/hard delete             |
-| Users          | `/users`          | GET, POST, PUT, DELETE (Admin only); PUT `/me/password` (self-service)     |
+| Invoices       | `/invoices`       | GET, POST, PUT, DELETE; `/payments` sub-resource                           |
+| Stock          | `/stock`          | GET, POST `/adjust`, POST `/initialize`, GET `/adjustments`                |
+| Dispensing     | `/dispensing`     | GET (paginated), POST, DELETE (Admin cancel)                               |
+| Financials     | `/financials`      | GET `/valuation`, `/aging`, `/gst`, `/profit` (Admin Only)                 |
+| Analytics      | `/analytics`       | GET `/stats` (Dashboard KPIs)                                              |
+| Lookups        | `/lookups`        | `/status`, `/supplier-types` full CRUD                                     |
+| Users          | `/users`          | GET, POST, PUT, DELETE; PUT `/me/password`                                 |
 
 ---
 
@@ -143,9 +147,13 @@ pytest tests/test_stock.py -v
 pytest tests/test_dispensing.py -v
 ```
 
-### 🌐 End-to-End — Playwright
+### 🌐 Frontend — Vitest & Playwright
 ```bash
 cd frontend
+# Unit tests with Vitest (coverage targeted at 60%)
+npm test
+
+# E2E tests with Playwright
 npx playwright test
 ```
 
@@ -155,11 +163,11 @@ npx playwright test
 
 | Layer      | Technology                                                   |
 |------------|--------------------------------------------------------------|
-| Frontend   | React 18, Vite, Vanilla CSS, Lucide React                   |
-| Backend    | FastAPI, SQLAlchemy 2.x, Pydantic v2                        |
+| Frontend   | React 19, Vite 8, Tailwind CSS v4, Lucide React              |
+| Backend    | FastAPI, SQLAlchemy 2.0, Pydantic v2                        |
 | Database   | PostgreSQL (Primary), SQLite (CI/Testing)                   |
 | Auth       | JWT (python-jose), PBKDF2-SHA256 password hashing           |
-| Testing    | pytest, FastAPI TestClient, Playwright                      |
+| Testing    | Vitest (Frontend), Playwright (E2E), pytest (Backend)       |
 | Container  | Docker, Docker Compose, Nginx (frontend reverse proxy)      |
 
 **Key Architecture Patterns:** Lifespan-based startup events, Unified DB error handling with rollback, Immutable stock audit trail, Atomic dispensing transactions, Automated request observability middleware.

@@ -7,8 +7,8 @@ This document provides a technical overview of the system's design patterns, rel
 ## Tech Stack Overview
 
 ### Frontend
-- **Framework**: React 18 (Vite)
-- **Styling**: Vanilla CSS (premium design with glassmorphism and micro-animations)
+- **Framework**: React 19 (Vite 8)
+- **Styling**: Tailwind CSS v4 (modern utility-first design)
 - **State Management**: Custom React Hooks (`useInvoices`, `useStock`, `useDispensing`, etc.)
 - **Auth**: JWT stored in `localStorage`; auto-attached to requests via `api/index.js` interceptor
 
@@ -38,7 +38,8 @@ This document provides a technical overview of the system's design patterns, rel
 | `seed.py`              | Idempotent startup seeding (statuses, supplier types, default admin user)                                  |
 | `core/config.py`       | `pydantic-settings` based configuration; `SECRET_KEY` is required at startup                               |
 | `core/logging_config.py` | Structured logging setup and `LoggingMiddleware`                                                         |
-| `routers/`             | One file per API domain (see module table below)                                                           |
+| `routers/`             | One file per API domain (routes traffic to services)                                                       |
+| `services/`            | Core business logic layer (Fat Service, Thin Router pattern)                                              |
 
 ### Router Modules
 
@@ -48,9 +49,11 @@ This document provides a technical overview of the system's design patterns, rel
 | `suppliers.py`       | `/suppliers`       | Admin, Manager               | V2 schema: nested contact + bank accounts         |
 | `medicines.py`       | `/medicines`       | Admin, Manager               | Master drug data with manufacturer linkage        |
 | `manufacturers.py`   | `/manufacturers`   | Admin, Manager               | Manufacturer master data                          |
-| `invoices.py`        | `/invoices`        | Admin, Manager               | Paginated + searchable; auto-increments stock     |
+| `invoices.py`        | `/invoices`        | Admin, Manager               | Paginated + searchable; calls `InvoiceService`    |
 | `stock.py`           | `/stock`           | Admin only                   | Manual adjustments and stock audit trail          |
-| `dispensing.py`      | `/dispensing`      | All authenticated            | Atomic stock deduction + audit record             |
+| `dispensing.py`      | `/dispensing`      | All authenticated            | Calls `DispensingService`; Atomic stock deduction |
+| `analytics.py`       | `/analytics`       | All authenticated            | Dashboard card metrics and KPI tracking           |
+| `financials.py`      | `/financials`      | Admin only                   | Advanced reporting: GST, Profit, Aging, Valuation |
 | `lookups.py`         | `/lookups`         | Admin only                   | Statuses and Supplier Types with soft/hard delete |
 | `users.py`           | `/users`           | Admin only                   | User CRUD; self-service password via `/me/password` |
 
@@ -89,18 +92,20 @@ Behaviour:
 - **`HTTPException`** (404, 400, 403 raised by business logic) → re-raised unchanged
 - **Any other `Exception`** → rolls back → HTTP **500** with `exc_info=True` logging
 
-### 2. Atomic Dispensing Transactions (`routers/dispensing.py`)
+### 2. Atomic Dispensing & FEFO Logic (`services/dispensing_service.py`)
 
-The dispensing workflow executes as a single atomic database transaction:
+The dispensing workflow is abstracted into a service to ensure atomicity and consistency:
 
-1. **Validate** medicine exists (→ 404 if not)
-2. **Check stock** — `quantity_on_hand >= requested quantity` (→ 400 if insufficient)
-3. **Deduct** `MedicineStock.quantity_on_hand` by the dispensed quantity
-4. **Write audit** — `StockAdjustment` record (`type=DISPENSED`, `quantity_change=-N`)
-5. **Persist** the `Dispensing` record with computed `total_amount`
-6. **Commit** — all or nothing
+1. **Price Fallback Precedence**:
+   - Primary: `StockBatch.mrp` (from earliest expiring batch).
+   - Fallback: `Medicine.unit_price` (Master price) if batch MRP is 0 or missing.
+   - Defaults: GST defaults to 5% if master price is used.
+2. **FEFO Deduction**: Stock is deducted from the earliest expiring batches first (**First Expiring, First Out**).
+3. **Check/Deduct**: Verifies `quantity_on_hand` >= requested.
+4. **Write Audit**: Creates a `StockAdjustment` record linked to the dispensing event.
+5. **Commit**: All operations (deduction, audit, dispensing record) occur in a single transaction.
 
-**Cancel (DELETE)** is Admin-only and reverses steps 2–5: restores stock, writes a `MANUAL_ADJUSTMENT` reversal audit record, and deletes the dispensing record.
+**Cancel (DELETE)** reverses these steps: restores specific batch stock, writes a reversal audit, and drops the record.
 
 ### 3. Invoice → Stock Auto-Update (`routers/invoices.py`)
 
@@ -174,15 +179,15 @@ Network: all services share a Docker bridge network (`pharmacy_net`).
 | Marker        | What it covers                                         | File examples                        |
 |---------------|--------------------------------------------------------|--------------------------------------|
 | `integration` | API endpoints + database (SQLite in-memory per test)  | `test_invoices.py`, `test_stock.py`  |
-| `unit`        | Pure logic, no DB required                             | `test_unit.py`                       |
+| `unit`        | Pure logic and services                                | `test_unit.py`                       |
 
 Test isolation: each test function gets a freshly created + fully dropped SQLite database via the `db` fixture in `conftest.py`.
 
-RBAC scenarios are covered by the `staff_client` fixture — a non-admin test client used to verify that admin-only endpoints correctly return **403 Forbidden**.
+### Frontend (`Vitest` + `Playwright`)
 
-### Frontend (`Playwright`)
-
-End-to-end tests covering login flow, invoice creation, stock adjustments, and dispensing from the browser perspective.
+- **Component Testing (Vitest)**: Unit tests for React components (`@testing-library/react`) in `frontend/src/tests/`.
+- **E2E Testing (Playwright)**: Full browser flows: login, invoice creation, and dispensing.
+- **Coverage Goal**: Target **60%+** cumulative coverage for frontend views and business logic.
 
 ---
 
