@@ -501,7 +501,7 @@ def test_dispensed_adjustment_in_history(client, db):
     dispensed_record = next((r for r in history if r["adjustment_type"] == "DISPENSED"), None)
     assert dispensed_record is not None
     assert dispensed_record["quantity_change"] == -10
-    assert "Dispensed to Regression Patient (Bulk/Single)" in dispensed_record["reason"]
+    assert "Dispensed to Regression Patient (FEFO Batch)" in dispensed_record["reason"]
 
 
 # ---------------------------------------------------------------------------
