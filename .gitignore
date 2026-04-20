@@ -55,3 +55,5 @@ frontend/playwright-report/
 pharmacy_backup_*.sql
 untracked_files.txt
 modified_files.txt
+docs/strategies/staging-and-feature-flags.md
+sync-prod-db.ps1

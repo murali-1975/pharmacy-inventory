@@ -7,6 +7,7 @@ import {
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { StatCard } from '../components/common/Common';
+import { formatINR } from '../utils/formatters';
 
 const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,14 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
   const fetchData = async () => {
     setLoading(true);
     setError(null);
+    
+    // Date Range Validation
+    if (new Date(dateRange.start) > new Date(dateRange.end)) {
+      setError("Invalid Date Range: The start date cannot be after the end date.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
       
@@ -114,13 +123,15 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
     doc.text(`Generated on: ${dateStr} at ${timeStr}`, 14, 46);
 
     const tableData = [
-      ["Opening Inventory Value", `Rs. ${(periodSummary?.opening_valuation || 0).toLocaleString()}`],
-      ["Inventory Value Added (+)", `Rs. ${(periodSummary?.inventory_added || 0).toLocaleString()}`],
-      ["Revenue from Goods Sold", `Rs. ${(periodSummary?.revenue || 0).toLocaleString()}`],
-      ["Cost of Goods Sold (-)", `Rs. ${(periodSummary?.cost_of_goods_sold || 0).toLocaleString()}`],
-      ["Net Adjustments (+/-)", `Rs. ${(periodSummary?.net_adjustments || 0).toLocaleString()}`],
-      ["Gross Profit", `Rs. ${(periodSummary?.gross_profit || 0).toLocaleString()}`],
-      ["Closing Inventory Value", `Rs. ${(periodSummary?.closing_valuation || 0).toLocaleString()}`]
+      ["Opening Inventory Value", formatINR(periodSummary?.opening_valuation).replace('₹', 'Rs. ')],
+      ["Purchase Value Added (+)", formatINR(periodSummary?.purchases_value).replace('₹', 'Rs. ')],
+      ["Initial Stock Initialized (+)", formatINR(periodSummary?.initial_stock_value).replace('₹', 'Rs. ')],
+      ["Revenue from Goods Sold", formatINR(periodSummary?.revenue).replace('₹', 'Rs. ')],
+      ["Cost of Goods Sold (-)", formatINR(periodSummary?.cost_of_goods_sold).replace('₹', 'Rs. ')],
+      ["Movement Adjustments (+/-)", formatINR(periodSummary?.adjustments_value).replace('₹', 'Rs. ')],
+      ["Stock Write-offs (-)", formatINR(periodSummary?.write_offs_value).replace('₹', 'Rs. ')],
+      ["Gross Profit", formatINR(periodSummary?.gross_profit).replace('₹', 'Rs. ')],
+      ["Closing Inventory Value", formatINR(periodSummary?.closing_valuation).replace('₹', 'Rs. ')]
     ];
 
     autoTable(doc, {
@@ -209,30 +220,30 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
         <StatCard 
           icon={TrendingUp} 
           label="Inventory Value (Cost)" 
-          value={`₹${(valuation?.total_cost_value || 0).toLocaleString()}`} 
+          value={formatINR(valuation?.total_cost_value)} 
           color="bg-indigo-600" 
           subValue={`${valuation?.batch_count || 0} Active Batches`}
         />
         <StatCard 
           icon={PieChart} 
           label="Projected Revenue" 
-          value={`₹${(valuation?.total_mrp_value || 0).toLocaleString()}`} 
+          value={formatINR(valuation?.total_mrp_value)} 
           color="bg-blue-600" 
           subValue="Total stock @ MRP"
         />
         <StatCard 
           icon={DollarSign} 
           label="Net GST Liability" 
-          value={`₹${(gst?.net_gst_liability || 0).toLocaleString()}`} 
+          value={formatINR(gst?.net_gst_liability)} 
           color={gst?.net_gst_liability >= 0 ? "bg-orange-600" : "bg-green-600"}
-          subValue={`${(gst?.output_gst || 0).toLocaleString()} Output collected`}
+          subValue={`${formatINR(gst?.output_gst)} Output collected`}
         />
         <StatCard 
           icon={IndianRupee} 
           label="Monthly Gross Profit" 
-          value={`₹${totalMonthlyProfit.toLocaleString()}`} 
+          value={formatINR(totalMonthlyProfit)} 
           color="bg-emerald-600" 
-          subValue={`${((totalMonthlyProfit / totalMonthlyRevenue) * 100 || 0).toFixed(1)}% Avg Margin`}
+          subValue={`${((totalMonthlyProfit / totalMonthlyRevenue) * 100 || 0).toFixed(0)}% Avg Margin`}
         />
       </div>
 
@@ -289,12 +300,12 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
                     <tr key={item.medicine_id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 font-bold text-gray-900">{item.medicine_name}</td>
                       <td className="px-6 py-4 text-center text-gray-500 font-medium">{item.quantity_sold}</td>
-                      <td className="px-6 py-4 text-right font-bold">₹{(item.revenue || 0).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-right font-black text-green-600">₹{(item.gross_profit || 0).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right font-bold">{formatINR(item.revenue)}</td>
+                      <td className="px-6 py-4 text-right font-black text-green-600">{formatINR(item.gross_profit)}</td>
 
                       <td className="px-6 py-4 text-center">
                         <span className="px-2 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black">
-                          {item.margin_percent.toFixed(1)}%
+                          {item.margin_percent.toFixed(0)}%
                         </span>
                       </td>
                     </tr>
@@ -331,11 +342,11 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
                   <div className="flex justify-between items-end">
                     <div className="space-y-1">
                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Balance Due</p>
-                      <p className="text-lg font-black text-gray-900">₹{(item.balance_due || 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-gray-900">{formatINR(item.balance_due)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] text-gray-400 font-bold uppercase">Total Invoiced</p>
-                      <p className="text-xs font-bold text-gray-500">₹{(item.total_invoiced || 0).toLocaleString()}</p>
+                      <p className="text-xs font-bold text-gray-500">{formatINR(item.total_invoiced)}</p>
                     </div>
                   </div>
                 </div>
@@ -376,10 +387,12 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
               {/* Statement Items */}
               {[
                 { label: "Opening Inventory Value", value: periodSummary?.opening_valuation, hint: "Value at cost at start of period", icon: Calendar, color: "text-gray-400" },
-                { label: "Inventory Value Added (+)", value: periodSummary?.inventory_added, hint: "Total stock received from suppliers", icon: ChevronUp, color: "text-blue-500" },
+                { label: "Purchase Value Added (+)", value: periodSummary?.purchases_value, hint: "Total stock received from suppliers", icon: RefreshCw, color: "text-blue-500" },
+                { label: "Initial Stock Initialized (+)", value: periodSummary?.initial_stock_value, hint: "Opening stock seeded during go-live", icon: ChevronUp, color: "text-indigo-500" },
                 { label: "Revenue from Goods Sold", value: periodSummary?.revenue, hint: "Total cash/credit sales generated", icon: TrendingUp, color: "text-emerald-500" },
                 { label: "Cost of Goods Sold (-)", value: periodSummary?.cost_of_goods_sold, hint: "Cost of medicines successfully dispensed", icon: ChevronDown, color: "text-orange-500" },
-                { label: "Net Adjustments (+/-)", value: periodSummary?.net_adjustments, hint: "Corrections, expirations & cancellations", icon: RefreshCw, color: "text-purple-500" },
+                { label: "Movement Adjustments (+/-)", value: periodSummary?.adjustments_value, hint: "Manual corrections & cancellations", icon: RefreshCw, color: "text-purple-500" },
+                { label: "Stock Write-offs (-)", value: periodSummary?.write_offs_value, hint: "Value of expired or damaged write-offs", icon: TrendingDown, color: "text-red-500" },
                 { label: "Gross Profit", value: periodSummary?.gross_profit, hint: "Revenue minus Cost of Goods Sold", icon: DollarSign, color: "text-green-600", highlighted: true },
                 { label: "Closing Inventory Value", value: periodSummary?.closing_valuation, hint: "Remaining stock value at end of period", icon: PieChart, color: "text-indigo-600", highlighted: true }
               ].map((item, idx) => (
@@ -395,7 +408,7 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
                   </div>
                   <div className="text-right">
                     <p className={`text-xl font-black ${item.highlighted ? "text-gray-900" : "text-gray-700"}`}>
-                      ₹{(item.value || 0).toLocaleString()}
+                      {formatINR(item.value)}
                     </p>
                   </div>
                 </div>

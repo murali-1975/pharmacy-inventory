@@ -401,6 +401,7 @@ class StockInitializeRequest(BaseModel):
     """
     medicine_id: int
     quantity: int = Field(..., ge=0, description="Absolute opening stock quantity (>= 0)")
+    purchase_price: Optional[float] = Field(None, description="Cost price per unit for this opening stock. If omitted, system defaults to 80% of master price.")
     initialized_date: datetime.date = Field(..., description="Date of the physical stock count / go-live date")
     notes: Optional[str] = Field(None, description="Optional remarks about this opening balance")
 
@@ -411,10 +412,12 @@ class PeriodSummaryReport(BaseModel):
     Reconciles inventory movements and profitability.
     """
     opening_valuation: float = Field(..., description="Inventory value at the start of the period (at cost)")
-    inventory_added: float = Field(..., description="Value of stock received via purchase invoices in range")
+    purchases_value: float = Field(..., description="Value of stock received via purchase invoices in range")
+    initial_stock_value: float = Field(..., description="Value of stock initialized via Opening Balance adjustments")
     revenue: float = Field(..., description="Total sales amount in the period")
     cost_of_goods_sold: float = Field(..., description="Cost value of items sold in the period (FEFO cost)")
-    net_adjustments: float = Field(..., description="Net value of system corrections (expirations, manual adjustments, cancellations)")
+    adjustments_value: float = Field(..., description="Net value of system corrections (manual adjustments, cancellations)")
+    write_offs_value: float = Field(..., description="Value of stock written off or expired")
     gross_profit: float = Field(..., description="Revenue - COGS")
     closing_valuation: float = Field(..., description="Inventory value at the end of the period (at cost)")
     start_date: datetime.date

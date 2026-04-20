@@ -477,7 +477,7 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
       const data = await fetchStockLedger(token, dateRange.from, dateRange.to, ledgerSearch, 0, 10000, onUnauthorized);
       const allItems = data.items;
       
-      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for more columns
+      const doc = new jsPDF('p', 'mm', 'a4'); // Portrait orientation
       const dateStr = new Date().toLocaleDateString();
       
       doc.setFontSize(20);
@@ -508,10 +508,10 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
         columnStyles: {
           0: { cellWidth: 15 },
           1: { cellWidth: 'auto' },
-          2: { halign: 'center', cellWidth: 35 },
-          3: { halign: 'center', cellWidth: 35 },
-          4: { halign: 'center', cellWidth: 35 },
-          5: { halign: 'center', cellWidth: 35, fontStyle: 'bold' },
+          2: { halign: 'center', cellWidth: 25 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 25 },
+          5: { halign: 'center', cellWidth: 25, fontStyle: 'bold' },
         }
       });
       

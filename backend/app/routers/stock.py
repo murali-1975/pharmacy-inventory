@@ -500,21 +500,30 @@ def initialize_stock(
         )
         
         if not batch_record:
+            # Determine cost price: Use provided price OR fallback to 80% of master price
+            resolved_cost = init_in.purchase_price if init_in.purchase_price is not None else (medicine.unit_price * 0.8)
+            
             batch_record = models.StockBatch(
                 medicine_id=init_in.medicine_id,
                 batch_no="OPENING-STOCK",
                 expiry_date=default_expiry,
                 quantity_on_hand=init_in.quantity,
-                purchase_price=medicine.unit_price, # Use master price for opening stock cost basis
-                mrp=medicine.unit_price,           # Initialize MRP from medicine master
+                purchase_price=resolved_cost,
+                mrp=medicine.unit_price,           # Original MRP from master
             )
             db.add(batch_record)
+            # Sync Master Price to match the new cost basis
+            medicine.unit_price = resolved_cost
         else:
             # For initialize stock, we SET the batch quantity to match the total
             batch_record.quantity_on_hand = init_in.quantity
-            # Sync pricing even on override if requested via force
+            # Sync pricing: Apply 80% patch if using master price (force=True logic)
+            resolved_cost = init_in.purchase_price if init_in.purchase_price is not None else (medicine.unit_price * 0.8)
             batch_record.mrp = medicine.unit_price
-            batch_record.purchase_price = medicine.unit_price
+            batch_record.purchase_price = resolved_cost
+            
+            # Sync Master Price to match the new cost basis
+            medicine.unit_price = resolved_cost
             # If multiple batches existed before, this initialization effectively 
             # consolidates them into the "Opening" record if force=True was used.
 

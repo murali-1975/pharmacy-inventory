@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, CreditCard, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { StatCard } from '../components/common/Common';
 import { formatDate } from '../utils/dateUtils';
+import { formatINR } from '../utils/formatters';
 
 const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {} }) => {
   const [stats, setStats] = useState({
@@ -136,7 +137,7 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
       <StatCard 
         icon={CreditCard} 
         label="Pending Payments" 
-        value={`₹${(stats?.pending_invoices_amount ?? 0).toLocaleString()}`} 
+        value={formatINR(stats?.pending_invoices_amount)} 
         trend={0} 
         color="bg-indigo-500" 
         subValue="to be paid" 
@@ -144,7 +145,7 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
       <StatCard 
         icon={TrendingUp} 
         label="Monthly Procurement" 
-        value={`₹${(stats?.monthly_procurement ?? 0).toLocaleString()}`} 
+        value={formatINR(stats?.monthly_procurement)} 
         trend={8.2} 
         color="bg-green-500" 
       />
@@ -193,7 +194,7 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
                   </div>
                 </div>
               </div>
-              <p className="font-bold text-gray-900">₹{inv.total_value.toLocaleString()}</p>
+              <p className="font-bold text-gray-900">{formatINR(inv.total_value)}</p>
             </div>
           ))}
           {recentInvoices.length === 0 && (

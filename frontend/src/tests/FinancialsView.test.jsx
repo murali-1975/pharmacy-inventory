@@ -40,12 +40,14 @@ describe('FinancialsView', () => {
 
   const mockPeriodSummary = {
     opening_valuation: 10000,
-    inventory_added: 5000,
+    purchases_value: 4000,
+    initial_stock_value: 1500,
     revenue: 3000,
-    cost_of_goods_sold: 2000,
-    net_adjustments: 0,
-    gross_profit: 1000,
-    closing_valuation: 13000
+    cost_of_goods_sold: 1800,
+    adjustments_value: 0,
+    write_offs_value: 300,
+    gross_profit: 1200,
+    closing_valuation: 15200
   };
 
   beforeEach(() => {
@@ -61,8 +63,6 @@ describe('FinancialsView', () => {
   });
 
   it('renders loading state initially', () => {
-    // We need a way to prevent immediate resolution to see loading state
-    // but for now let's just test that the data renders after loading
     render(<FinancialsView token={mockToken} />);
     expect(screen.getByText(/Crunching financial data/i)).toBeInTheDocument();
   });
@@ -76,10 +76,32 @@ describe('FinancialsView', () => {
 
     expect(screen.getByText('Financial Reports')).toBeInTheDocument();
     
-    // Check StatCards (using regular expressions to match formatted numbers)
-    expect(screen.getByText('₹75,000')).toBeInTheDocument(); // MRP Value
+    expect(screen.getByText('₹75,000')).toBeInTheDocument(); 
     expect(screen.getByText(/15 Active Batches/)).toBeInTheDocument();
-    expect(screen.getByText('₹500')).toBeInTheDocument(); // GST Liability
+    expect(screen.getByText('₹500')).toBeInTheDocument(); 
+  });
+
+  it('renders period summary with new granular fields after tab switch', async () => {
+    await React.act(async () => {
+      render(<FinancialsView token={mockToken} />);
+    });
+    
+    await waitFor(() => expect(screen.queryByText(/Crunching financial data/i)).not.toBeInTheDocument());
+
+    // Switch to Period tab
+    const periodTabBtn = screen.getByText(/Period Portfolio Summary/i);
+    fireEvent.click(periodTabBtn);
+
+    // Verify new granular labels exist
+    expect(screen.getByText(/Purchase Value Added/i)).toBeInTheDocument();
+    expect(screen.getByText(/Initial Stock Initialized/i)).toBeInTheDocument();
+    expect(screen.getByText(/Movement Adjustments/i)).toBeInTheDocument();
+    expect(screen.getByText(/Stock Write-offs/i)).toBeInTheDocument();
+
+    // Verify values (₹4,000 and ₹1,500 from mock)
+    expect(screen.getByText('₹4,000')).toBeInTheDocument();
+    expect(screen.getByText('₹1,500')).toBeInTheDocument();
+    expect(screen.getByText('₹300')).toBeInTheDocument();
   });
 
   it('renders profitability and aging tables', async () => {
@@ -91,7 +113,7 @@ describe('FinancialsView', () => {
 
     expect(screen.getByText('Paracetamol')).toBeInTheDocument();
     expect(screen.getByText('Main Pharma')).toBeInTheDocument();
-    expect(screen.getByText('₹5,000')).toBeInTheDocument(); // Balance due
+    expect(screen.getByText('₹5,000')).toBeInTheDocument();
   });
 
   it('handles error state', async () => {
@@ -102,6 +124,25 @@ describe('FinancialsView', () => {
     });
     
     expect(await screen.findByText(/Failed to fetch one or more financial reports/i)).toBeInTheDocument();
+  });
+  
+  it('handles invalid date range by showing specific error', async () => {
+    // Set dates in inverted order
+    const startDate = '2026-04-30';
+    const endDate = '2026-04-20';
+    
+    const { container } = render(<FinancialsView token={mockToken} />);
+    
+    await waitFor(() => expect(screen.queryByText(/Crunching financial data/i)).not.toBeInTheDocument());
+    
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: startDate } });
+    fireEvent.change(dateInputs[1], { target: { value: endDate } });
+    
+    // The fetchData call is triggered by the effect when dateRange changes
+    await waitFor(() => {
+        expect(screen.getByText(/Invalid Date Range: The start date cannot be after the end date/i)).toBeInTheDocument();
+    });
   });
 
   it('refetches data when dates change', async () => {

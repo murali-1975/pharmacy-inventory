@@ -7,7 +7,7 @@ import pandas as pd
 import io
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func, case, or_, and_
 from app import models, schemas
 from app.core.logging_config import logger
 
@@ -202,12 +202,15 @@ def get_profit_summary(db: Session, start_date: date, end_date: date) -> List[Di
 
 def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[str, Any]:
     """
-    Calculates the 5-point movement statement for a given period.
+    Calculates the detailed movement statement for a given period.
     Logic:
     - Opening/Closing Valuation: Reconstructs batch state at T using audit trail.
-    - Inventory Added: Sum of INVOICE_RECEIPT adjustments at cost.
+    - Purchases Value: Sum of INVOICE_RECEIPT adjustments.
+    - Initial Stock Value: Sum of OPENING_BALANCE adjustments.
     - Revenue: Sum of total_amount from Dispensing records.
     - COGS: Sum of DISPENSED adjustments at cost.
+    - Adjustments: Sum of MANUAL_ADJUSTMENT.
+    - Write-offs: Sum of WRITE_OFF.
     """
     if start_date > end_date:
         logger.error(f"Invalid date range for period summary: {start_date} to {end_date}")
@@ -215,70 +218,77 @@ def get_period_summary(db: Session, start_date: date, end_date: date) -> Dict[st
 
     logger.info(f"Generating Period Portfolio Summary from {start_date} to {end_date}.")
 
-    # 1. Opening Valuation
+    # 1. Opening/Closing Valuation
     opening_val = _get_valuation_at_date(db, start_date)
-
-    # 2. Closing Valuation
-    # Closing is end of day, so we look at state as of (end_date + 1)
     closing_val = _get_valuation_at_date(db, end_date + timedelta(days=1))
 
-    # 3. Inventory Added (Invoices and Initializations ONLY)
-    added_val = db.query(
-        func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
-    ).select_from(models.StockAdjustment)\
-     .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
-     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
-     .filter(
-         models.StockAdjustment.adjustment_type.in_([
-             models.StockAdjustmentType.INVOICE_RECEIPT,
-             models.StockAdjustmentType.OPENING_BALANCE
-         ]),
-         func.date(models.StockAdjustment.adjusted_at) >= start_date,
-         func.date(models.StockAdjustment.adjusted_at) <= end_date
-     ).scalar() or 0.0
+    # Helper for summed valuation of specific adjustment types
+    def get_adj_sum(types: list):
+        return db.query(
+            func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
+        ).select_from(models.Medicine)\
+         .join(models.StockAdjustment, models.StockAdjustment.medicine_id == models.Medicine.id)\
+         .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
+         .filter(
+             models.StockAdjustment.adjustment_type.in_(types),
+             func.date(models.StockAdjustment.adjusted_at) >= start_date,
+             func.date(models.StockAdjustment.adjusted_at) <= end_date
+         ).scalar() or 0.0
 
-    # 4. Net Adjustments (Manual Adjustments, Expirations, Cancellations)
-    # This can be positive or negative.
-    net_adjustments_val = db.query(
+    # 2. Movement Breakdowns
+    purchases_val = get_adj_sum([models.StockAdjustmentType.INVOICE_RECEIPT])
+    initial_stock_val = get_adj_sum([models.StockAdjustmentType.OPENING_BALANCE])
+    # For general adjustments, exclude sale reversals (which are handled in COGS)
+    adjustments_val = db.query(
         func.sum(models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
-    ).select_from(models.StockAdjustment)\
+    ).select_from(models.Medicine)\
+     .join(models.StockAdjustment, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
-     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
          models.StockAdjustment.adjustment_type == models.StockAdjustmentType.MANUAL_ADJUSTMENT,
+         ~models.StockAdjustment.reason.ilike("Reversal of cancelled dispensing%"),
          func.date(models.StockAdjustment.adjusted_at) >= start_date,
          func.date(models.StockAdjustment.adjusted_at) <= end_date
      ).scalar() or 0.0
+    
+    write_offs_val = get_adj_sum([models.StockAdjustmentType.WRITE_OFF])
 
-    # 5. Revenue & COGS
-    # Revenue is straight from Dispensing records
-    rev_data = db.query(
-        func.sum(models.Dispensing.total_amount).label("revenue")
+    # 3. Revenue & COGS
+    revenue = db.query(
+        func.sum(models.Dispensing.total_amount)
     ).filter(
         models.Dispensing.dispensed_date >= start_date,
         models.Dispensing.dispensed_date <= end_date
-    ).first()
-    revenue = float(rev_data.revenue or 0.0)
+    ).scalar() or 0.0
 
-    # COGS is cost of items dispensed ONLY
     cogs_val = db.query(
-        func.sum(func.abs(models.StockAdjustment.quantity_change) * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
-    ).select_from(models.StockAdjustment)\
+        func.sum(-models.StockAdjustment.quantity_change * func.coalesce(models.StockBatch.purchase_price, models.Medicine.unit_price, 0))
+    ).select_from(models.Medicine)\
+     .join(models.StockAdjustment, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .outerjoin(models.StockBatch, models.StockAdjustment.batch_id == models.StockBatch.id)\
-     .join(models.Medicine, models.StockAdjustment.medicine_id == models.Medicine.id)\
      .filter(
-         models.StockAdjustment.adjustment_type == models.StockAdjustmentType.DISPENSED,
-         func.date(models.StockAdjustment.adjusted_at) >= start_date,
-         func.date(models.StockAdjustment.adjusted_at) <= end_date
+         and_(
+            or_(
+                models.StockAdjustment.adjustment_type == models.StockAdjustmentType.DISPENSED,
+                and_(
+                    models.StockAdjustment.adjustment_type == models.StockAdjustmentType.MANUAL_ADJUSTMENT,
+                    models.StockAdjustment.reason.ilike("Reversal of cancelled dispensing%")
+                )
+            ),
+            func.date(models.StockAdjustment.adjusted_at) >= start_date,
+            func.date(models.StockAdjustment.adjusted_at) <= end_date
+         )
      ).scalar() or 0.0
 
     return {
         "opening_valuation": float(opening_val),
-        "inventory_added": float(added_val),
-        "revenue": revenue,
+        "purchases_value": float(purchases_val),
+        "initial_stock_value": float(initial_stock_val),
+        "revenue": float(revenue),
         "cost_of_goods_sold": float(cogs_val),
-        "net_adjustments": float(net_adjustments_val),
-        "gross_profit": revenue - float(cogs_val),
+        "adjustments_value": float(adjustments_val),
+        "write_offs_value": float(write_offs_val),
+        "gross_profit": float(revenue) - float(cogs_val),
         "closing_valuation": float(closing_val),
         "start_date": start_date,
         "end_date": end_date
