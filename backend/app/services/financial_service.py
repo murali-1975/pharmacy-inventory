@@ -5,6 +5,8 @@ Handles business logic, complex data aggregation, and logging for financial repo
 from datetime import date, timedelta
 import pandas as pd
 import io
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, or_, and_
@@ -15,25 +17,77 @@ from app.core.logging_config import logger
 def export_period_summary_excel(db: Session, summary: Dict[str, Any]) -> io.BytesIO:
     """
     Generates an Excel spreadsheet for the period summary.
-    Includes the high-level movement statement and a timestamp.
+    Includes the high-level movement statement and specific required formatting.
     """
     logger.info(f"Generating Excel export for period summary: {summary['start_date']} to {summary['end_date']}")
     
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Summary of Inventory Sold"
+    
+    # 1. Period Title Header
+    ws.merge_cells('B1:C1')
+    title_cell = ws['B1']
+    title_cell.value = f"Period {summary['start_date']} to {summary['end_date']}"
+    
+    # 2. Table Headers
+    headers = ['S.No', 'Description', 'Amount (₹)']
+    header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    header_font = Font(bold=True)
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'), 
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    for col_idx, h in enumerate(headers, start=1):
+        cell = ws.cell(row=3, column=col_idx, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+        cell.border = thin_border
+        
+    # 3. Table Data
     data = [
-        {"Description": "Opening Inventory Value", "Amount (₹)": summary["opening_valuation"]},
-        {"Description": "Inventory Value Added (+)", "Amount (₹)": summary["inventory_added"]},
-        {"Description": "Revenue from Goods Sold", "Amount (₹)": summary["revenue"]},
-        {"Description": "Cost of Goods Sold (-)", "Amount (₹)": summary["cost_of_goods_sold"]},
-        {"Description": "Gross Profit", "Amount (₹)": summary["gross_profit"]},
-        {"Description": "Closing Inventory Value", "Amount (₹)": summary["closing_valuation"]}
+        {"desc": "Opening Inventory Value", "amt": summary.get("opening_valuation", 0)},
+        {"desc": "Purchase Value Added (+)", "amt": summary.get("purchases_value", 0)},
+        {"desc": "Initial Stock Initialized (+)", "amt": summary.get("initial_stock_value", 0)},
+        {"desc": "Revenue from Goods Sold", "amt": summary.get("revenue", 0)},
+        {"desc": "Cost of Goods Sold (-)", "amt": summary.get("cost_of_goods_sold", 0)},
+        {"desc": "Movement Adjustments (+/-)", "amt": summary.get("adjustments_value", 0)},
+        {"desc": "Stock Write-offs (-)", "amt": summary.get("write_offs_value", 0)},
+        {"desc": "Gross Profit", "amt": summary.get("gross_profit", 0)},
+        {"desc": "Closing Inventory Value", "amt": summary.get("closing_valuation", 0)}
     ]
     
-    df = pd.DataFrame(data)
+    currency_format = '[$₹-en-IN] * #,##0.00'
     
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Period Portfolio Summary')
+    for idx, row_data in enumerate(data, start=1):
+        row_num = idx + 3
         
+        # S.No
+        c_sno = ws.cell(row=row_num, column=1, value=idx)
+        c_sno.alignment = Alignment(horizontal="center")
+        c_sno.border = thin_border
+        
+        # Description
+        c_desc = ws.cell(row=row_num, column=2, value=row_data['desc'])
+        c_desc.border = thin_border
+        
+        # Amount
+        c_amt = ws.cell(row=row_num, column=3, value=row_data['amt'])
+        c_amt.number_format = currency_format
+        c_amt.border = thin_border
+
+    # 4. Column Sizing
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 40
+    ws.column_dimensions['C'].width = 25
+
+    # 5. Export to BytesIO
+    output = io.BytesIO()
+    wb.save(output)
     output.seek(0)
     return output
 

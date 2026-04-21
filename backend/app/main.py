@@ -46,7 +46,7 @@ app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 # CORS Configuration: Allow specific origins for development and production
 # CORS Configuration: Allow all origins for simplified LAN access.
 # Since we are using an Nginx proxy, the Origin header will match the host's IP/Hostname.
-origins = ["*"]
+origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
 
 app.add_middleware(
     CORSMiddleware,

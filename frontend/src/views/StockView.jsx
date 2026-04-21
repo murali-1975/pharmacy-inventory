@@ -322,11 +322,7 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm, loadStock]);
 
-  useEffect(() => {
-    if (activeTab === "ledger") {
-      loadLedger(ledgerPage, ledgerSearch);
-    }
-  }, [activeTab, ledgerPage, ledgerSearch, dateRange.from, dateRange.to]);
+
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > Math.ceil(totalRecords / pageSize)) return;
@@ -449,7 +445,7 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
     }
   };
 
-  const loadLedger = async (page = 1, search = "") => {
+  const loadLedger = useCallback(async (page = 1, search = "") => {
     setLedgerLoading(true);
     setError("");
     try {
@@ -466,7 +462,13 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
     } finally {
       setLedgerLoading(false);
     }
-  };
+  }, [token, dateRange.from, dateRange.to, onUnauthorized]);
+
+  useEffect(() => {
+    if (activeTab === "ledger") {
+      loadLedger(ledgerPage, ledgerSearch);
+    }
+  }, [activeTab, ledgerPage, ledgerSearch, loadLedger]);
 
   const handleExportLedgerPDF = async () => {
     setLoading(true);

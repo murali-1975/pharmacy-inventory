@@ -5,7 +5,7 @@ and profit margin calculations across the pharmacy's entire dataset.
 """
 from datetime import date
 from typing import List
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from app import models, schemas, database, auth, utils
 from app.services import financial_service

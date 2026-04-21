@@ -15,8 +15,6 @@ import { Search, Plus, Building2, User, Mail, Database, X, Edit, Trash2 } from '
  */
 const SuppliersView = ({ 
   suppliers, 
-  statuses, 
-  types, 
   onAddClick, 
   onEditClick, 
   onDeleteClick,

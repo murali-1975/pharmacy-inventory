@@ -6,6 +6,7 @@ This script is idempotent and can be safely run multiple times.
 from sqlalchemy.orm import Session
 from . import models, auth, database
 from .core.logging_config import logger
+import os
 
 def seed_database(db: Session):
     """
@@ -38,7 +39,7 @@ def seed_database(db: Session):
     # 3. Seed Default Admin User
     admin_username = "admin"
     admin_email = "admin@pharmacy.com"
-    admin_password = "admin1234$"
+    admin_password = os.getenv("SEED_ADMIN_PASSWORD", "admin1234$")
     
     existing_admin = db.query(models.User).filter(models.User.username == admin_username).first()
     if not existing_admin:
