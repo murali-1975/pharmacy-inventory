@@ -13,14 +13,17 @@ const handleResponse = async (res) => {
     throw new Error('Unauthorized');
   }
   
+  // In tests, res.headers might be missing. Default to JSON in that case for compatibility.
+  const contentType = res.headers ? res.headers.get('content-type') : 'application/json';
+  const isJson = contentType && contentType.includes('application/json');
+
   if (res.status === 409) {
-    const data = await res.json().catch(() => ({}));
+    const data = isJson ? await res.json().catch(() => ({})) : {};
     throw { status: 409, message: data.detail || 'Conflict error', detail: data.detail };
   }
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    // Specific business error details
+    const data = isJson ? await res.json().catch(() => ({})) : {};
     if (data.detail && typeof data.detail === 'object') {
        throw new Error(data.detail.msg || JSON.stringify(data.detail));
     }
@@ -28,7 +31,14 @@ const handleResponse = async (res) => {
   }
   
   if (res.status === 204) return null;
-  return res.json();
+  
+  if (isJson) {
+    return res.json();
+  } else {
+    const text = (res.text && typeof res.text === 'function') ? await res.text() : "No body text available";
+    console.warn(`Expected JSON but got ${contentType || 'unknown'}. Body snippet: ${text.substring(0, 100)}`);
+    throw new Error("Server returned non-JSON response");
+  }
 };
 
 export const api = {
@@ -298,8 +308,57 @@ export const api = {
     if (res.status === 401) throw new Error('Unauthorized');
     if (!res.ok) throw new Error('Failed to download template');
     return res.blob();
-  }
-};
+  },
+
+  // Finance
+  getFinanceMasters: async (token, includeInactive = false) => {
+    const url = includeInactive ? `${API_BASE}/finance/masters?include_inactive=true` : `${API_BASE}/finance/masters`;
+    const res = await fetch(url, { headers: getHeaders(token) });
+    return handleResponse(res);
+  },
+
+  saveFinanceMaster: async (token, entity, masterData, id = null) => {
+    const url = id ? `${API_BASE}/finance/masters/${entity}/${id}` : `${API_BASE}/finance/masters/${entity}`;
+    const res = await fetch(url, {
+      method: id ? 'PUT' : 'POST',
+      headers: getHeaders(token),
+      body: JSON.stringify(masterData)
+    });
+    return handleResponse(res);
+  },
+
+  toggleFinanceMaster: async (token, entity, id) => {
+    const res = await fetch(`${API_BASE}/finance/masters/${entity}/${id}/toggle`, {
+      method: 'PATCH',
+      headers: getHeaders(token)
+    });
+    return handleResponse(res);
+  },
+
+  savePatientPayment: async (token, paymentData) => {
+    const res = await fetch(`${API_BASE}/finance/payments`, {
+      method: 'POST',
+      headers: getHeaders(token),
+      body: JSON.stringify(paymentData)
+    });
+    return handleResponse(res);
+  },
+
+    getPatientPayments: async (token, skip = 0, limit = 10, patientName = '', date = '') => {
+      let url = `${API_BASE}/finance/payments?skip=${skip}&limit=${limit}`;
+      if (patientName) url += `&patient_name=${encodeURIComponent(patientName)}`;
+      if (date) url += `&date=${encodeURIComponent(date)}`;
+      const res = await fetch(url, { headers: getHeaders(token) });
+      return handleResponse(res);
+    },
+  
+    getFinanceDashboardStats: async (token) => {
+      const res = await fetch(`${API_BASE}/finance/analytics/dashboard`, {
+        headers: getHeaders(token)
+      });
+      return handleResponse(res);
+    }
+  };
 
 export default api;
 

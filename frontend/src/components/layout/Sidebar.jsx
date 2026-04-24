@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut, LayoutDashboard, Package, Settings, X, Menu, DollarSign } from 'lucide-react';
 import { SidebarItem } from '../common/Common';
+import { Feature } from '../../context/FeatureContext';
 
 const Sidebar = ({ 
   sidebarOpen, 
@@ -61,6 +62,19 @@ const Sidebar = ({
           onClick={() => setActiveTab('stock')} 
           isOpen={sidebarOpen}
         />
+        
+        <Feature name="FINANCE_MANAGEMENT">
+          <div className="pt-8 pb-2">
+            {sidebarOpen && <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Finance</p>}
+            <SidebarItem 
+              icon={DollarSign} 
+              label="Finance" 
+              active={activeTab === 'finance'} 
+              onClick={() => setActiveTab('finance')} 
+              isOpen={sidebarOpen}
+            />
+          </div>
+        </Feature>
         
         {currentUser?.role === 'Admin' && (
           <div className="pt-8 pb-2">

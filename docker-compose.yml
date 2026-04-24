@@ -24,6 +24,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - SECRET_KEY=${SECRET_KEY}
+      - FEATURE_FLAGS=${FEATURE_FLAGS:-}
       - PORT=8000
     ports:
       - "8000:8000"

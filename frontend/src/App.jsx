@@ -16,6 +16,9 @@ import ManufacturerForm from './components/manufacturers/ManufacturerForm';
 import MedicineForm from './components/medicines/MedicineForm';
 import StockView from './views/StockView';
 import FinancialsView from './views/FinancialsView';
+import FinanceView from './views/Finance/FinanceView';
+import api from './api';
+import { Feature } from './context/FeatureContext';
 
 
 // Layout Components
@@ -269,6 +272,15 @@ const App = () => {
               currentUser={currentUser}
               token={token}
             />
+          )}
+          {activeTab === 'finance' && (
+            <Feature name="FINANCE_MANAGEMENT">
+              <FinanceView 
+                token={token} 
+                currentUser={currentUser} 
+                onUnauthorized={logout} 
+              />
+            </Feature>
           )}
         </section>
       </main>

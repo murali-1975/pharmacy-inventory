@@ -96,6 +96,7 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 7. **Stock Tracking** — Intelligent stock ledger with audit trail for every change (invoice receipts, manual adjustments, dispensing, write-offs, opening balance).
 8. **RBAC** — Role-based access: Admin, Manager, Staff with endpoint-level guards.
 9. **Unified Error Handling** — Automated database error handlers with auto-rollback and structured HTTP error mapping.
+10. **Finance Management (Feature Toggled)** — Patient payment tracking including patient identifiers, multiple services rendered, and multi-mode payment breakdown. Currently scoped behind the `FINANCE_MANAGEMENT` environment variable flag.
 
 ---
 
@@ -114,6 +115,7 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 | Analytics      | `/analytics`       | GET `/stats` (Dashboard KPIs)                                              |
 | Lookups        | `/lookups`        | `/status`, `/supplier-types` full CRUD                                     |
 | Users          | `/users`          | GET, POST, PUT, DELETE; PUT `/me/password`                                 |
+| Finance        | `/finance`        | GET, POST for `/payments` and `/masters` (Identifiers, Services, Modes)    |
 
 ---
 

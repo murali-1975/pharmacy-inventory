@@ -370,3 +370,88 @@ class Dispensing(Base):
 
     def __repr__(self) -> str:
         return f"<Dispensing id={self.id} patient={self.patient_name!r} medicine_id={self.medicine_id}>"
+
+# ==============================================================================
+# FINANCE MANAGEMENT MODULE
+# ==============================================================================
+
+class PatientIdentifier(Base):
+    """Master list of patient identifier types."""
+    __tablename__ = "patient_identifier"
+    id = Column(Integer, primary_key=True, index=True)
+    id_name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+class PatientService(Base):
+    """Master list of patient services."""
+    __tablename__ = "patient_services"
+    id = Column(Integer, primary_key=True, index=True)
+    service_name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+class PaymentModeMaster(Base):
+    """Master list of payment modes for Finance Module."""
+    __tablename__ = "payment_mode"
+    id = Column(Integer, primary_key=True, index=True)
+    mode = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+class PatientPayment(Base):
+    """Core transaction record capturing the patient's visit and overall bill."""
+    __tablename__ = "patient_payment"
+    id = Column(Integer, primary_key=True, index=True)
+    patient_name = Column(String, nullable=False)
+    payment_date = Column(Date, nullable=False)
+    total_amount = Column(Float, nullable=False, default=0.0)
+    gst_amount = Column(Float, default=0.0)
+    notes = Column(String, nullable=True)
+    free_flag = Column(Boolean, nullable=False, default=False)
+    token_no = Column(Integer, nullable=True)
+    
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+    modified_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    modified_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+
+    creator = relationship("User", foreign_keys=[created_by])
+    modifier = relationship("User", foreign_keys=[modified_by])
+    identifiers = relationship("PatientPaymentIdentifier", back_populates="patient_payment", cascade="all, delete-orphan")
+    services = relationship("PatientPaymentService", back_populates="patient_payment", cascade="all, delete-orphan")
+    payments = relationship("PatientPaymentValue", back_populates="patient_payment", cascade="all, delete-orphan")
+
+class PatientPaymentIdentifier(Base):
+    """Junction mapping PatientPayment to PatientIdentifier."""
+    __tablename__ = "ptnt_pymnt_x_ptnt_id"
+    id = Column(Integer, primary_key=True, index=True)
+    patient_payment_id = Column(Integer, ForeignKey("patient_payment.id", ondelete="CASCADE"), nullable=False)
+    identifier_id = Column(Integer, ForeignKey("patient_identifier.id", ondelete="RESTRICT"), nullable=False)
+    id_value = Column(String, nullable=False)
+
+    patient_payment = relationship("PatientPayment", back_populates="identifiers")
+    identifier = relationship("PatientIdentifier")
+
+class PatientPaymentService(Base):
+    """Junction mapping PatientPayment to PatientService."""
+    __tablename__ = "ptnt_pmnt_x_ptnt_srvcs"
+    id = Column(Integer, primary_key=True, index=True)
+    patient_payment_id = Column(Integer, ForeignKey("patient_payment.id", ondelete="CASCADE"), nullable=False)
+    service_id = Column(Integer, ForeignKey("patient_services.id", ondelete="RESTRICT"), nullable=False)
+    amount = Column(Float, nullable=False, default=0.0)
+
+    patient_payment = relationship("PatientPayment", back_populates="services")
+    service = relationship("PatientService")
+
+class PatientPaymentValue(Base):
+    """Details the exact payment breakdown for the entire transaction (aggregate)."""
+    __tablename__ = "ptnt_pmnt_value"
+    id = Column(Integer, primary_key=True, index=True)
+    patient_payment_id = Column(Integer, ForeignKey("patient_payment.id", ondelete="CASCADE"), nullable=False)
+    payment_mode_id = Column(Integer, ForeignKey("payment_mode.id", ondelete="RESTRICT"), nullable=False)
+    value = Column(Float, nullable=False, default=0.0)
+    notes = Column(String, nullable=True)
+    modified_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    modified_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+
+    patient_payment = relationship("PatientPayment", back_populates="payments")
+    payment_mode = relationship("PaymentModeMaster")
+    modifier = relationship("User", foreign_keys=[modified_by])

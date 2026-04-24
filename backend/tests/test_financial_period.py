@@ -201,8 +201,16 @@ def test_period_summary_reconciliation_after_cancellation(client, db):
     ))
 
     # 3. Sale (Dispensing ID 3 mock)
-    # We don't add the dispensing record to DB to mock a DELETED/CANCELLED sale
-    # in the eyes of the Revenue query (which would return 0).
+    # We create the dispensing record first to satisfy the FK constraint.
+    # Set total_amount=0 to simulate a 'cancelled/no-revenue' state for the revenue query.
+    disp = models.Dispensing(
+        id=3,
+        dispensed_date=t3, patient_name="Cancel Patient", medicine_id=med.id,
+        quantity=5, unit_price=20.0, total_amount=0.0, recorded_by_user_id=1
+    )
+    db.add(disp)
+    db.flush()
+
     db.add(models.StockAdjustment(
         medicine_id=med.id, batch_id=batch.id, quantity_change=-5,
         adjustment_type=models.StockAdjustmentType.DISPENSED, reason="sale",

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Token expiry — 30 minutes balances security and usability
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Feature Toggles (comma-separated list of active flags like "STAGING_ANALYTICS,NEW_UI")
+    FEATURE_FLAGS: str = os.getenv("FEATURE_FLAGS", "")
+
     # Primary database connection string
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:admin@localhost/pharmacy_inventory")
 
@@ -39,6 +42,7 @@ class Settings(BaseSettings):
             )
 
     class Config:
-        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env")
+        extra = "ignore"
 
 settings = Settings()

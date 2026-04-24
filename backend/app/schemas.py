@@ -4,7 +4,7 @@ Used for request validation (Create/Update) and response serialization (Schema).
 """
 import datetime
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import List, Optional, Union
 
 class InvoiceStatus(str, Enum):
@@ -41,8 +41,7 @@ class StatusSchema(StatusBase):
     """Response schema for status lookups."""
     id: int
     is_active: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SupplierTypeBase(BaseModel):
     name: str
@@ -54,8 +53,7 @@ class SupplierTypeSchema(SupplierTypeBase):
     """Response schema for supplier type lookups."""
     id: int
     is_active: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- User Schemas ---
 class UserBase(BaseModel):
@@ -81,8 +79,7 @@ class UserSchema(UserBase):
     id: int
     is_active: bool
     status: Optional[StatusSchema] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserPasswordUpdate(BaseModel):
     """Schema for users to update their own password."""
@@ -102,8 +99,7 @@ class BankAccountCreate(BankAccountBase):
 class BankAccountSchema(BankAccountBase):
     """Response schema for supplier bank accounts."""
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ContactDetailBase(BaseModel):
     """Shared contact and address fields for suppliers."""
@@ -125,8 +121,7 @@ class ContactDetailCreate(ContactDetailBase):
 class ContactDetailSchema(ContactDetailBase):
     """Response schema for supplier contact details."""
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SupplierBase(BaseModel):
     """Shared fields for supplier creation and updates."""
@@ -146,8 +141,7 @@ class SupplierSchema(SupplierBase):
     status: Optional[StatusSchema] = None
     bank_details: List[BankAccountSchema] = []
     contact_details: Optional[ContactDetailSchema] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Manufacturer Schemas ---
 class ManufacturerBase(BaseModel):
@@ -164,8 +158,7 @@ class ManufacturerSchema(ManufacturerBase):
     """Response schema for drug manufacturers."""
     id: int
     is_active: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Stock Batch Schemas ---
 class StockBatchSchema(BaseModel):
@@ -180,8 +173,7 @@ class StockBatchSchema(BaseModel):
     gst: float = 0.0
     received_at: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Medicine Schemas ---
 class MedicineBase(BaseModel):
@@ -225,8 +217,7 @@ class MedicineSchema(MedicineBase):
     quantity_on_hand: int = 0
     manufacturer: Optional[ManufacturerSchema] = None
     batches: List[StockBatchSchema] = []
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Invoice Schemas ---
 class InvoiceLineItemBase(BaseModel):
@@ -249,8 +240,7 @@ class InvoiceLineItemSchema(InvoiceLineItemBase):
     """Response schema for invoice line items."""
     id: int
     medicine: Optional[MedicineSchema] = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class InvoiceBase(BaseModel):
     """Shared fields for invoice creation and updates."""
@@ -281,8 +271,7 @@ class InvoiceSchema(InvoiceBase):
     supplier: Optional[SupplierSchema] = None
     line_items: List[InvoiceLineItemSchema] = []
     payments: List['InvoicePaymentSchema'] = []
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class InvoicePaymentBase(BaseModel):
     invoice_id: int
@@ -300,8 +289,7 @@ class InvoicePaymentSchema(InvoicePaymentBase):
     id: int
     created_date: datetime.datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Update forward references
 InvoiceSchema.model_rebuild()
@@ -335,8 +323,7 @@ class MedicineStockSchema(MedicineStockBase):
     gst_percent: float = 0.0
     medicine: Optional[MedicineSchema] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PaginatedStockSchema(BaseModel):
     """Paginated list of medicine stock records."""
@@ -384,8 +371,7 @@ class StockAdjustmentSchema(BaseModel):
     medicine: Optional[MedicineSchema] = None
     batch: Optional[StockBatchSchema] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StockInitializeRequest(BaseModel):
@@ -462,8 +448,7 @@ class DispensingSchema(BaseModel):
     created_at: datetime.datetime
     medicine: Optional[MedicineSchema] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedDispensing(BaseModel):
@@ -528,3 +513,153 @@ class FinancialSummarySchema(BaseModel):
     total_receivable_gst: float
     total_payable_debt: float
     monthly_profit: float
+
+# --- Finance Management Schemas ---
+
+class PatientIdentifierBase(BaseModel):
+    id_name: str
+    is_active: bool = True
+
+class PatientIdentifierCreate(PatientIdentifierBase):
+    pass
+
+class PatientIdentifierUpdate(PatientIdentifierBase):
+    """Schema for updating a patient identifier."""
+    pass
+
+class PatientIdentifierSchema(PatientIdentifierBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientServiceBase(BaseModel):
+    service_name: str
+    is_active: bool = True
+
+class PatientServiceCreate(PatientServiceBase):
+    pass
+
+class PatientServiceUpdate(PatientServiceBase):
+    """Schema for updating a patient service."""
+    pass
+
+class PatientServiceSchema(PatientServiceBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class PaymentModeMasterBase(BaseModel):
+    mode: str
+    is_active: bool = True
+
+class PaymentModeMasterCreate(PaymentModeMasterBase):
+    pass
+
+class PaymentModeMasterUpdate(PaymentModeMasterBase):
+    """Schema for updating a payment mode."""
+    pass
+
+class PaymentModeMasterSchema(PaymentModeMasterBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientPaymentValueBase(BaseModel):
+    payment_mode_id: int
+    value: float
+    notes: Optional[str] = None
+
+class PatientPaymentValueCreate(PatientPaymentValueBase):
+    pass
+
+class PatientPaymentValueSchema(PatientPaymentValueBase):
+    id: int
+    modified_date: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientPaymentServiceBase(BaseModel):
+    service_id: int
+    amount: float
+
+class PatientPaymentServiceCreate(PatientPaymentServiceBase):
+    pass
+
+class PatientPaymentServiceSchema(PatientPaymentServiceBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientPaymentIdentifierBase(BaseModel):
+    identifier_id: int
+    id_value: str
+
+class PatientPaymentIdentifierCreate(PatientPaymentIdentifierBase):
+    pass
+
+class PatientPaymentIdentifierSchema(PatientPaymentIdentifierBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientPaymentBase(BaseModel):
+    patient_name: str
+    payment_date: datetime.date
+    total_amount: float
+    gst_amount: float = 0.0
+    notes: Optional[str] = None
+    free_flag: bool = False
+    token_no: Optional[int] = None
+
+class PatientPaymentCreate(PatientPaymentBase):
+    identifiers: List[PatientPaymentIdentifierCreate] = []
+    services: List[PatientPaymentServiceCreate] = []
+    payments: List[PatientPaymentValueCreate] = []
+
+class PatientPaymentUpdate(PatientPaymentBase):
+    """Schema for updating a patient payment record."""
+    pass
+
+class PatientPaymentSchema(PatientPaymentBase):
+    id: int
+    created_date: Optional[datetime.datetime] = None
+    identifiers: List[PatientPaymentIdentifierSchema] = []
+    services: List[PatientPaymentServiceSchema] = []
+    payments: List[PatientPaymentValueSchema] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedPatientPayment(BaseModel):
+    total: int
+    items: List[PatientPaymentSchema]
+
+class FinanceMastersSchema(BaseModel):
+    identifiers: List[PatientIdentifierSchema]
+    services: List[PatientServiceSchema]
+    payment_modes: List[PaymentModeMasterSchema]
+
+class BulkPaymentResult(BaseModel):
+    success_count: int
+    error_count: int
+    error_csv_content: Optional[str] = None
+
+
+# =============================================================================
+# Finance Dashboard Schemas
+# =============================================================================
+
+class ServiceIncome(BaseModel):
+    service_name: str
+    total_amount: float
+    count: int
+
+class PaymentModeIncome(BaseModel):
+    mode_name: str
+    total_value: float
+    count: int
+
+class DailyTrend(BaseModel):
+    date: str
+    amount: float
+
+class FinanceDashboardStats(BaseModel):
+    total_income_today: float
+    total_income_month: float
+    patient_count_today: int
+    avg_ticket_size: float
+    service_distribution: List[ServiceIncome]
+    payment_mode_distribution: List[PaymentModeIncome]
+    recent_trends: List[DailyTrend]

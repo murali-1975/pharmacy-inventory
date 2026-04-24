@@ -57,41 +57,51 @@ steps:
     args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend', '--all-tags']
     waitFor: ['build-frontend']
 
-  # 6. Deploy Backend to Cloud Run
+  # 6. Deploy Backend to Cloud Run (Bifurcated)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-backend'
-    entrypoint: gcloud
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - 'pharmacy-backend'
-      - '--image'
-      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
-      - '--region'
-      - '$_REGION'
-      - '--set-secrets'
-      - 'DATABASE_URL=PHARMACY_DB_URL:latest,SECRET_KEY=PHARMACY_SECRET_KEY:latest'
-      - '--add-cloudsql-instances'
-      - '$PROJECT_ID:$_REGION:$_DB_INSTANCE'
-      - '--allow-unauthenticated'
-      - '--port'
-      - '8000'
+      - '-c'
+      - |
+        if [ "$BRANCH_NAME" = "staging" ]; then
+          TARGET_SERVICE="pharmacy-backend-staging"
+        else
+          TARGET_SERVICE="pharmacy-backend"
+        fi
+        
+        echo "🚀 Deploying to $$TARGET_SERVICE..."
+        gcloud run deploy $$TARGET_SERVICE \
+          --image '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA' \
+          --region '$_REGION' \
+          --set-secrets 'DATABASE_URL=PHARMACY_DB_URL:latest,SECRET_KEY=PHARMACY_SECRET_KEY:latest' \
+          --add-cloudsql-instances '$PROJECT_ID:$_REGION:$_DB_INSTANCE' \
+          --allow-unauthenticated \
+          --port 8000
     waitFor: ['push-backend']
 
-  # 7. Deploy Frontend to Cloud Run
-  # Note: This step dynamically discovers the Backend URL for true automation.
+  # 7. Deploy Frontend to Cloud Run (Bifurcated)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-frontend'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "🔍 Discovering Backend URL..."
-        B_URL=$$(gcloud run services describe pharmacy-backend --region $_REGION --format='value(status.url)')
+        if [ "$BRANCH_NAME" = "staging" ]; then
+          TARGET_B_SERVICE="pharmacy-backend-staging"
+          TARGET_F_SERVICE="pharmacy-frontend-staging"
+        else
+          TARGET_B_SERVICE="pharmacy-backend"
+          TARGET_F_SERVICE="pharmacy-frontend"
+        fi
+
+        echo "🔍 Discovering Backend URL for $$TARGET_B_SERVICE..."
+        B_URL=$$(gcloud run services describe $$TARGET_B_SERVICE --region $_REGION --format='value(status.url)')
         if [ -z "$$B_URL" ]; then echo "❌ Error: Could not find backend URL"; exit 1; fi
         echo "✅ Detected Backend URL: $$B_URL"
         
-        gcloud run deploy pharmacy-frontend \
+        echo "🚀 Deploying to $$TARGET_F_SERVICE..."
+        gcloud run deploy $$TARGET_F_SERVICE \
           --image "$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA" \
           --region "$_REGION" \
           --update-env-vars "BACKEND_URL=$$B_URL" \
