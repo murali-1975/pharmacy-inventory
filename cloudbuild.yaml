@@ -21,6 +21,7 @@ steps:
         export PYTHONPATH=$$PYTHONPATH:$$(pwd)/backend
         export SECRET_KEY="build-validation-key"
         export DATABASE_URL="sqlite:///:memory:"
+        export FEATURE_FLAGS="FINANCE_MANAGEMENT"
         python -m pytest backend/tests -v
 
   # 2. Build Backend Image
