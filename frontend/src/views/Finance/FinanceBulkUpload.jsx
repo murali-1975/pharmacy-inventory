@@ -19,22 +19,17 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`/api/finance/payments/template`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.status === 401) { onUnauthorized(); return; }
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'finance_payment_template.csv';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
+      const blob = await api.getFinanceTemplate(token);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'finance_payment_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError("Failed to download template");
+      if (err.message === 'Unauthorized') onUnauthorized();
+      else setError("Failed to download template");
     }
   };
 

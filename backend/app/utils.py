@@ -1,49 +1,43 @@
 """
 Shared Utility Helpers for the Pharmacy Inventory API.
-
-This module provides reusable building blocks used across all routers:
-
-  db_error_handler  — A context manager that wraps database operations to catch
-                      SQLAlchemy errors, roll back the session if needed, log the
-                      problem, and return a clean HTTP error to the client. It also
-                      distinguishes IntegrityError (e.g., duplicate unique keys) from
-                      generic DB failures so callers receive a meaningful 409 vs 500.
-
-Usage:
-    with utils.db_error_handler("invoice creation", db):
-        # ... database operations ...
-        db.commit()
 """
 from contextlib import contextmanager
+from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app.core.logging_config import logger
+
+class AppError(Exception):
+    """Base class for application-specific errors."""
+    def __init__(self, message: str, status_code: int = 500, detail: Any = None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.detail = detail
+
+class ResourceNotFoundError(AppError):
+    def __init__(self, resource: str, identifier: Any):
+        super().__init__(f"{resource} with ID {identifier} not found", status_code=404)
+
+class ValidationError(AppError):
+    def __init__(self, message: str, detail: Any = None):
+        super().__init__(message, status_code=400, detail=detail)
+
+class FinanceModuleError(AppError):
+    def __init__(self, message: str, detail: Any = None):
+        super().__init__(f"Finance Error: {message}", status_code=400, detail=detail)
 
 
 @contextmanager
 def db_error_handler(operation_name: str, db_session=None):
     """
     Context manager for consistent SQLAlchemy error handling across routers.
-
-    Behaviour:
-    - ``IntegrityError`` (e.g., unique constraint violation, FK violation)
-      → rolls back, logs a warning, raises HTTP 409 Conflict.
-    - Other ``SQLAlchemyError`` (connection issues, query errors, etc.)
-      → rolls back, logs an error, raises HTTP 500 Internal Server Error.
-    - ``HTTPException`` (404, 400, 403, etc. raised by business logic)
-      → re-raised as-is without modification.
-    - Any other unexpected exception
-      → rolls back, logs an error, raises HTTP 500.
-
-    Args:
-        operation_name: A short human-readable label used in log messages
-                        (e.g., ``"invoice creation"``, ``"stock adjustment"``).
-        db_session:     The SQLAlchemy ``Session`` to roll back on error.
-                        Pass ``None`` for read-only operations where rollback
-                        is not required.
     """
     try:
         yield
+    except AppError as e:
+        # Re-raise our custom application errors
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except IntegrityError as e:
         if db_session:
             db_session.rollback()
@@ -63,7 +57,6 @@ def db_error_handler(operation_name: str, db_session=None):
             detail=f"Internal database error occurred during {operation_name}"
         )
     except HTTPException:
-        # Re-raise HTTPExceptions (404s, 400s, 403s, etc.) without modification
         raise
     except Exception as e:
         if db_session:

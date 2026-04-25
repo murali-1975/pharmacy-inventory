@@ -1,10 +1,8 @@
 """
 Finance Management API Endpoints.
-
-Provides CRUD operations for finance master data (Patient Identifiers,
-Patient Services, Payment Modes) and patient payment transaction management.
 """
 import datetime
+from datetime import date
 import io
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Response
@@ -16,6 +14,7 @@ from app.database import get_db
 from app.auth import get_current_user, RoleChecker
 from app import models, schemas, utils
 from app.services.finance_service import FinanceService
+from app.utils import ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ router = APIRouter(prefix="/finance", tags=["Finance Management"])
 admin_required = RoleChecker(["Admin"])
 
 # =============================================================================
-# Master Data — CREATE (Admin Restricted)
+# Master Data Endpoints
 # =============================================================================
 
 @router.post("/masters/patient_identifiers", response_model=schemas.PatientIdentifierSchema)
@@ -33,51 +32,12 @@ def create_patient_identifier(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Create a new patient identifier type. Admin only."""
     with utils.db_error_handler("creating patient identifier", db):
         db_obj = models.PatientIdentifier(**ident_in.model_dump())
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
-        logger.info(f"User {current_user.username} created patient identifier: {db_obj.id_name}")
         return db_obj
-
-
-@router.post("/masters/patient_services", response_model=schemas.PatientServiceSchema)
-def create_patient_service(
-    srv_in: schemas.PatientServiceCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(admin_required),
-):
-    """Create a new patient service. Admin only."""
-    with utils.db_error_handler("creating patient service", db):
-        db_obj = models.PatientService(**srv_in.model_dump())
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        logger.info(f"User {current_user.username} created patient service: {db_obj.service_name}")
-        return db_obj
-
-
-@router.post("/masters/payment_modes", response_model=schemas.PaymentModeMasterSchema)
-def create_payment_mode(
-    pm_in: schemas.PaymentModeMasterCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(admin_required),
-):
-    """Create a new payment mode. Admin only."""
-    with utils.db_error_handler("creating payment mode", db):
-        db_obj = models.PaymentModeMaster(**pm_in.model_dump())
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        logger.info(f"User {current_user.username} created payment mode: {db_obj.mode}")
-        return db_obj
-
-
-# =============================================================================
-# Master Data — UPDATE (Admin Restricted)
-# =============================================================================
 
 @router.put("/masters/patient_identifiers/{id}", response_model=schemas.PatientIdentifierSchema)
 def update_patient_identifier(
@@ -86,17 +46,41 @@ def update_patient_identifier(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Update an existing patient identifier type."""
     with utils.db_error_handler("updating patient identifier", db):
         db_obj = db.query(models.PatientIdentifier).filter(models.PatientIdentifier.id == id).first()
         if not db_obj:
-            raise HTTPException(status_code=404, detail="Identifier not found")
+            raise ResourceNotFoundError("Identifier", id)
         for key, value in ident_in.model_dump().items():
             setattr(db_obj, key, value)
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
+@router.post("/masters/patient_services", response_model=schemas.PatientServiceSchema)
+def create_patient_service(
+    srv_in: schemas.PatientServiceCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(admin_required),
+):
+    with utils.db_error_handler("creating patient service", db):
+        db_obj = models.PatientService(**srv_in.model_dump())
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+@router.post("/masters/payment_modes", response_model=schemas.PaymentModeMasterSchema)
+def create_payment_mode(
+    pm_in: schemas.PaymentModeMasterCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(admin_required),
+):
+    with utils.db_error_handler("creating payment mode", db):
+        db_obj = models.PaymentModeMaster(**pm_in.model_dump())
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
 
 @router.put("/masters/patient_services/{id}", response_model=schemas.PatientServiceSchema)
 def update_patient_service(
@@ -105,17 +89,15 @@ def update_patient_service(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Update an existing patient service."""
     with utils.db_error_handler("updating patient service", db):
         db_obj = db.query(models.PatientService).filter(models.PatientService.id == id).first()
         if not db_obj:
-            raise HTTPException(status_code=404, detail="Service not found")
+            raise ResourceNotFoundError("Service", id)
         for key, value in srv_in.model_dump().items():
             setattr(db_obj, key, value)
         db.commit()
         db.refresh(db_obj)
         return db_obj
-
 
 @router.put("/masters/payment_modes/{id}", response_model=schemas.PaymentModeMasterSchema)
 def update_payment_mode(
@@ -124,21 +106,15 @@ def update_payment_mode(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Update an existing payment mode."""
     with utils.db_error_handler("updating payment mode", db):
         db_obj = db.query(models.PaymentModeMaster).filter(models.PaymentModeMaster.id == id).first()
         if not db_obj:
-            raise HTTPException(status_code=404, detail="Payment mode not found")
+            raise ResourceNotFoundError("Payment mode", id)
         for key, value in pm_in.model_dump().items():
             setattr(db_obj, key, value)
         db.commit()
         db.refresh(db_obj)
         return db_obj
-
-
-# =============================================================================
-# Master Data — TOGGLE (Admin Restricted)
-# =============================================================================
 
 @router.patch("/masters/{entity}/{id}/toggle", response_model=None)
 def toggle_master_data(
@@ -147,7 +123,6 @@ def toggle_master_data(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Toggle active status for any master data entity."""
     with utils.db_error_handler(f"toggling {entity}", db):
         model = None
         if entity == "patient_identifiers": model = models.PatientIdentifier
@@ -157,16 +132,11 @@ def toggle_master_data(
 
         db_obj = db.query(model).filter(model.id == id).first()
         if not db_obj:
-            raise HTTPException(status_code=404, detail="Item not found")
+            raise ResourceNotFoundError(entity, id)
         
         db_obj.is_active = not db_obj.is_active
         db.commit()
         return {"id": id, "is_active": db_obj.is_active}
-
-
-# =============================================================================
-# Master Data — READ (Authenticated Users)
-# =============================================================================
 
 @router.get("/masters", response_model=schemas.FinanceMastersSchema)
 def get_finance_masters(
@@ -174,25 +144,23 @@ def get_finance_masters(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Fetch all finance master data (identifiers, services, payment modes)."""
-    if include_inactive:
-        identifiers = db.query(models.PatientIdentifier).all()
-        services = db.query(models.PatientService).all()
-        payment_modes = db.query(models.PaymentModeMaster).all()
-    else:
-        identifiers = db.query(models.PatientIdentifier).filter(models.PatientIdentifier.is_active == True).all()
-        services = db.query(models.PatientService).filter(models.PatientService.is_active == True).all()
-        payment_modes = db.query(models.PaymentModeMaster).filter(models.PaymentModeMaster.is_active == True).all()
+    query_ids = db.query(models.PatientIdentifier)
+    query_srvs = db.query(models.PatientService)
+    query_modes = db.query(models.PaymentModeMaster)
+
+    if not include_inactive:
+        query_ids = query_ids.filter(models.PatientIdentifier.is_active == True)
+        query_srvs = query_srvs.filter(models.PatientService.is_active == True)
+        query_modes = query_modes.filter(models.PaymentModeMaster.is_active == True)
 
     return {
-        "identifiers": identifiers,
-        "services": services,
-        "payment_modes": payment_modes,
+        "identifiers": query_ids.all(),
+        "services": query_srvs.all(),
+        "payment_modes": query_modes.all(),
     }
 
-
 # =============================================================================
-# Patient Payments — Transaction Endpoints
+# Patient Payments Endpoints
 # =============================================================================
 
 @router.post("/payments", response_model=schemas.PatientPaymentSchema, status_code=status.HTTP_201_CREATED)
@@ -201,14 +169,11 @@ def create_patient_payment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Record a new patient payment transaction."""
     with utils.db_error_handler("recording patient payment", db):
         db_payment = FinanceService.record_payment(db, payment_in, current_user.id)
         db.commit()
         db.refresh(db_payment)
-        logger.info(f"Payment recorded for {db_payment.patient_name} by {current_user.username}")
         return db_payment
-
 
 @router.get("/payments", response_model=schemas.PaginatedPatientPayment)
 def get_patient_payments(
@@ -216,16 +181,21 @@ def get_patient_payments(
     limit: int = Query(50, ge=1, le=100),
     patient_name: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Retrieve paginated patient payment history with filtering."""
-    query = db.query(models.PatientPayment)
+    query = db.query(models.PatientPayment).filter(models.PatientPayment.is_deleted == False)
     
     if patient_name:
         query = query.filter(models.PatientPayment.patient_name.ilike(f"%{patient_name}%"))
     if date:
         query = query.filter(models.PatientPayment.payment_date == date)
+    if from_date:
+        query = query.filter(models.PatientPayment.payment_date >= from_date)
+    if to_date:
+        query = query.filter(models.PatientPayment.payment_date <= to_date)
         
     total = query.count()
     items = (
@@ -236,19 +206,19 @@ def get_patient_payments(
     )
     return {"total": total, "items": items}
 
-
 @router.get("/payments/{id}", response_model=schemas.PatientPaymentSchema)
 def get_patient_payment(
     id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Retrieve a specific payment record by ID."""
-    record = db.query(models.PatientPayment).filter(models.PatientPayment.id == id).first()
+    record = db.query(models.PatientPayment).filter(
+        models.PatientPayment.id == id,
+        models.PatientPayment.is_deleted == False
+    ).first()
     if not record:
-        raise HTTPException(status_code=404, detail="Payment record not found")
+        raise ResourceNotFoundError("Payment record", id)
     return record
-
 
 @router.put("/payments/{id}", response_model=schemas.PatientPaymentSchema)
 def update_patient_payment(
@@ -257,19 +227,23 @@ def update_patient_payment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Update basic patient payment details."""
     with utils.db_error_handler("updating patient payment", db):
-        db_obj = db.query(models.PatientPayment).filter(models.PatientPayment.id == id).first()
+        db_obj = db.query(models.PatientPayment).filter(
+            models.PatientPayment.id == id,
+            models.PatientPayment.is_deleted == False
+        ).first()
         if not db_obj:
-            raise HTTPException(status_code=404, detail="Payment record not found")
+            raise ResourceNotFoundError("Payment record", id)
+        
         for key, value in payment_in.model_dump(exclude={"identifiers", "services"}).items():
             setattr(db_obj, key, value)
+        
         db_obj.modified_by = current_user.id
         db_obj.modified_date = datetime.datetime.now(datetime.timezone.utc)
         db.commit()
         db.refresh(db_obj)
+        FinanceService.recalculate_daily_summary(db, db_obj.payment_date)
         return db_obj
-
 
 @router.delete("/payments/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_patient_payment(
@@ -277,48 +251,15 @@ def delete_patient_payment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Delete a patient payment record (Admin only)."""
     with utils.db_error_handler("deleting patient payment", db):
-        db_obj = db.query(models.PatientPayment).filter(models.PatientPayment.id == id).first()
-        if not db_obj:
-            raise HTTPException(status_code=404, detail="Payment record not found")
-        db.delete(db_obj)
-        db.commit()
+        success = FinanceService.soft_delete_payment(db, id, current_user.id)
+        if not success:
+            raise ResourceNotFoundError("Payment record", id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-
 # =============================================================================
-# Bulk Upload Endpoints (Admin Only)
+# Bulk Upload & Analytics Endpoints
 # =============================================================================
-
-@router.get("/payments/template")
-def download_payment_template(current_user: models.User = Depends(admin_required)):
-    """Generate and return a CSV template for bulk payment upload."""
-    cols = ["Date", "Patient Name", "Token No", "Identifier Type", "ID Value", "Service Name", "Payment Mode", "Amount", "GST", "Notes"]
-    df = pd.DataFrame(columns=cols)
-    sample = {
-        "Date": datetime.date.today().strftime("%Y-%m-%d"),
-        "Patient Name": "Sample Patient",
-        "Token No": 101,
-        "Identifier Type": "UHID",
-        "ID Value": "12345",
-        "Service Name": "Consultation",
-        "Payment Mode": "Cash",
-        "Amount": 500,
-        "GST": 0,
-        "Notes": "Regular visit"
-    }
-    df = pd.concat([df, pd.DataFrame([sample])], ignore_index=True)
-    
-    stream = io.StringIO()
-    df.to_csv(stream, index=False)
-    
-    return Response(
-        content=stream.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=payment_bulk_template.csv"}
-    )
-
 
 @router.post("/payments/upload", response_model=schemas.BulkPaymentResult)
 async def upload_payments(
@@ -326,14 +267,9 @@ async def upload_payments(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(admin_required),
 ):
-    """Process a bulk upload of patient payment records."""
-    logger.info(f"Bulk Payment: Upload started for {file.filename} by {current_user.username}")
     try:
         contents = await file.read()
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
+        df = pd.read_csv(io.BytesIO(contents)) if file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(contents))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
 
@@ -353,17 +289,47 @@ async def upload_payments(
         "error_csv_content": error_csv
     }
 
-
-# =============================================================================
-# Dashboard & Analytics
-# =============================================================================
-
 @router.get("/analytics/dashboard", response_model=schemas.FinanceDashboardStats)
 def get_finance_dashboard(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """
-    Fetch high-level financial statistics for the dashboard.
-    """
-    return FinanceService.get_dashboard_stats(db)
+    return FinanceService.get_dashboard_stats(db, start_date, end_date)
+
+@router.get("/reports/summary", response_model=schemas.PaginatedDailySummary)
+def get_daily_summaries(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    query = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.patient_count > 0)
+    if start_date:
+        query = query.filter(models.DailyFinanceSummary.summary_date >= start_date)
+    if end_date:
+        query = query.filter(models.DailyFinanceSummary.summary_date <= end_date)
+        
+    all_summaries = query.order_by(models.DailyFinanceSummary.summary_date.desc()).all()
+    total = len(all_summaries)
+    
+    # Restoring Grand Totals calculation
+    grand_total = {
+        "patient_count": 0, "total_revenue": 0.0, "total_collected": 0.0, "total_gst": 0.0,
+        "service_breakdown": {}, "payment_breakdown": {}
+    }
+    for s in all_summaries:
+        grand_total["patient_count"] += s.patient_count
+        grand_total["total_revenue"] += s.total_revenue
+        grand_total["total_collected"] += s.total_collected
+        grand_total["total_gst"] += s.total_gst
+        for name, amt in s.service_breakdown.items():
+            grand_total["service_breakdown"][name] = grand_total["service_breakdown"].get(name, 0.0) + amt
+        for mode, amt in s.payment_breakdown.items():
+            grand_total["payment_breakdown"][mode] = grand_total["payment_breakdown"].get(mode, 0.0) + amt
+
+    items = all_summaries[skip : skip + limit]
+    return {"total": total, "items": items, "grand_total": grand_total}

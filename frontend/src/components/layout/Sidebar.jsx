@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, LayoutDashboard, Package, Settings, X, Menu, DollarSign } from 'lucide-react';
+import { LogOut, LayoutDashboard, Package, Settings, X, Menu, DollarSign, TrendingUp, History, Plus, Database, FileText } from 'lucide-react';
 import { SidebarItem } from '../common/Common';
 import { Feature } from '../../context/FeatureContext';
 
@@ -66,13 +66,47 @@ const Sidebar = ({
         <Feature name="FINANCE_MANAGEMENT">
           <div className="pt-8 pb-2">
             {sidebarOpen && <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Finance</p>}
+            {currentUser?.role === 'Admin' && (
+              <>
+                <SidebarItem 
+                  icon={TrendingUp} 
+                  label="Finance Dashboard" 
+                  active={activeTab === 'finance-dashboard'} 
+                  onClick={() => setActiveTab('finance-dashboard')} 
+                  isOpen={sidebarOpen}
+                />
+                <SidebarItem 
+                  icon={FileText} 
+                  label="Daily Summaries" 
+                  active={activeTab === 'finance-summary'} 
+                  onClick={() => setActiveTab('finance-summary')} 
+                  isOpen={sidebarOpen}
+                />
+              </>
+            )}
             <SidebarItem 
-              icon={DollarSign} 
-              label="Finance" 
-              active={activeTab === 'finance'} 
-              onClick={() => setActiveTab('finance')} 
+              icon={History} 
+              label="Payment History" 
+              active={activeTab === 'finance-history'} 
+              onClick={() => setActiveTab('finance-history')} 
               isOpen={sidebarOpen}
             />
+            <SidebarItem 
+              icon={Plus} 
+              label="Record Payment" 
+              active={activeTab === 'finance-record'} 
+              onClick={() => setActiveTab('finance-record')} 
+              isOpen={sidebarOpen}
+            />
+            {currentUser?.role === 'Admin' && (
+              <SidebarItem 
+                icon={Database} 
+                label="Master Data" 
+                active={activeTab === 'finance-masters'} 
+                onClick={() => setActiveTab('finance-masters')} 
+                isOpen={sidebarOpen}
+              />
+            )}
           </div>
         </Feature>
         

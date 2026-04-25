@@ -18,15 +18,19 @@ const FinanceDashboard = ({ token, onUnauthorized }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState({
+    start: '',
+    end: ''
+  });
 
   useEffect(() => {
     fetchStats();
-  }, [token]);
+  }, [token, dateRange]);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await api.getFinanceDashboardStats(token);
+      const data = await api.getFinanceDashboardStats(token, dateRange.start, dateRange.end);
       setStats(data);
     } catch (err) {
       if (err.message === 'Unauthorized') onUnauthorized();
@@ -63,43 +67,106 @@ const FinanceDashboard = ({ token, onUnauthorized }) => {
     );
   }
 
+  const calculateTrend = (current, previous, isPercentage = true) => {
+    if (previous === 0) return current > 0 ? (isPercentage ? "+100%" : `+${current}`) : (isPercentage ? "0%" : "0");
+    const diff = current - previous;
+    if (isPercentage) {
+      const pct = (diff / previous) * 100;
+      return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    }
+    return `${diff > 0 ? '+' : ''}${diff}`;
+  };
+
+  const handleSetToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setDateRange({ start: today, end: today });
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {/* Date Range Filter Bar */}
+      <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+            <Calendar className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-slate-800 tracking-tight">Time Horizon</h4>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Filter Analytics</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">From</span>
+            <input 
+              type="date"
+              data-testid="start-date-picker"
+              className="bg-transparent border-none outline-none text-xs font-bold text-slate-700"
+              value={dateRange.start}
+              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">To</span>
+            <input 
+              type="date"
+              data-testid="end-date-picker"
+              className="bg-transparent border-none outline-none text-xs font-bold text-slate-700"
+              value={dateRange.end}
+              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+            />
+          </div>
+          <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block" />
+          <button 
+            onClick={handleSetToday}
+            className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100"
+          >
+            Today
+          </button>
+          <button 
+            onClick={() => setDateRange({ start: '', end: '' })}
+            className="px-4 py-2 text-slate-400 hover:text-slate-600 text-xs font-black uppercase tracking-widest transition-all"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
       {/* Top Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard 
           label="Total Revenue (Month)" 
           value={`₹${stats.total_income_month.toLocaleString()}`} 
-          subLabel="Compared to last month"
-          trend="+12.4%"
-          positive={true}
+          subLabel="MTD vs Prev. Month"
+          trend={calculateTrend(stats.total_income_month, stats.total_income_prev_month_mtd)}
+          positive={stats.total_income_month >= stats.total_income_prev_month_mtd}
           icon={Wallet}
           color="indigo"
         />
         <MetricCard 
           label="Revenue Today" 
           value={`₹${stats.total_income_today.toLocaleString()}`} 
-          subLabel="Daily collection status"
-          trend="+5.2%"
-          positive={true}
+          subLabel="vs. Yesterday"
+          trend={calculateTrend(stats.total_income_today, stats.total_income_yesterday)}
+          positive={stats.total_income_today >= stats.total_income_yesterday}
           icon={TrendingUp}
           color="emerald"
         />
         <MetricCard 
           label="Patient Visits" 
           value={stats.patient_count_today} 
-          subLabel="Patients recorded today"
-          trend="+2"
-          positive={true}
+          subLabel="vs. Yesterday"
+          trend={calculateTrend(stats.patient_count_today, stats.patient_count_yesterday, false)}
+          positive={stats.patient_count_today >= stats.patient_count_yesterday}
           icon={Users}
           color="amber"
         />
         <MetricCard 
           label="Avg. Ticket Size" 
           value={`₹${Math.round(stats.avg_ticket_size).toLocaleString()}`} 
-          subLabel="Per patient revenue"
-          trend="-1.5%"
-          positive={false}
+          subLabel="vs. Yesterday"
+          trend={calculateTrend(stats.avg_ticket_size, stats.avg_ticket_yesterday)}
+          positive={stats.avg_ticket_size >= stats.avg_ticket_yesterday}
           icon={Target}
           color="rose"
         />
@@ -111,7 +178,11 @@ const FinanceDashboard = ({ token, onUnauthorized }) => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="text-xl font-black text-slate-800 tracking-tight">Income by Service</h3>
-              <p className="text-sm text-slate-400 font-medium mt-1">Service-wise revenue contribution this month</p>
+              <p className="text-sm text-slate-400 font-medium mt-1">
+                {dateRange.start || dateRange.end 
+                  ? `Revenue contribution from ${dateRange.start || 'Beginning'} to ${dateRange.end || 'Today'}`
+                  : 'Service-wise revenue contribution this month'}
+              </p>
             </div>
             <div className="bg-slate-50 p-2 rounded-xl flex gap-1">
               <button className="px-3 py-1.5 bg-white shadow-sm border border-slate-200 rounded-lg text-xs font-bold text-indigo-600">Month</button>

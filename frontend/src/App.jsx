@@ -273,12 +273,14 @@ const App = () => {
               token={token}
             />
           )}
-          {activeTab === 'finance' && (
+          {activeTab.startsWith('finance-') && (
             <Feature name="FINANCE_MANAGEMENT">
               <FinanceView 
                 token={token} 
                 currentUser={currentUser} 
-                onUnauthorized={logout} 
+                onUnauthorized={logout}
+                subTab={activeTab.split('-')[1]}
+                setActiveTab={setActiveTab}
               />
             </Feature>
           )}

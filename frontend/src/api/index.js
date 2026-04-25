@@ -335,28 +335,65 @@ export const api = {
     return handleResponse(res);
   },
 
-  savePatientPayment: async (token, paymentData) => {
-    const res = await fetch(`${API_BASE}/finance/payments`, {
-      method: 'POST',
+  savePatientPayment: async (token, paymentData, id = null) => {
+    const url = id ? `${API_BASE}/finance/payments/${id}` : `${API_BASE}/finance/payments`;
+    const res = await fetch(url, {
+      method: id ? 'PUT' : 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(paymentData)
     });
     return handleResponse(res);
   },
 
-    getPatientPayments: async (token, skip = 0, limit = 10, patientName = '', date = '') => {
+    getPatientPayments: async (token, skip = 0, limit = 10, patientName = '', date = '', fromDate = '', toDate = '') => {
       let url = `${API_BASE}/finance/payments?skip=${skip}&limit=${limit}`;
       if (patientName) url += `&patient_name=${encodeURIComponent(patientName)}`;
       if (date) url += `&date=${encodeURIComponent(date)}`;
+      if (fromDate) url += `&from_date=${encodeURIComponent(fromDate)}`;
+      if (toDate) url += `&to_date=${encodeURIComponent(toDate)}`;
       const res = await fetch(url, { headers: getHeaders(token) });
       return handleResponse(res);
     },
   
-    getFinanceDashboardStats: async (token) => {
-      const res = await fetch(`${API_BASE}/finance/analytics/dashboard`, {
+    getFinanceDashboardStats: async (token, start = '', end = '') => {
+      let url = `${API_BASE}/finance/analytics/dashboard`;
+      const params = new URLSearchParams();
+      if (start) params.append('start_date', start);
+      if (end) params.append('end_date', end);
+      if (params.toString()) url += `?${params.toString()}`;
+
+      const res = await fetch(url, {
         headers: getHeaders(token)
       });
       return handleResponse(res);
+    },
+
+    getDailyFinanceSummaries: async (token, start, end, skip = 0, limit = 100) => {
+      let url = `${API_BASE}/finance/reports/summary?skip=${skip}&limit=${limit}`;
+      if (start) url += `&start_date=${start}`;
+      if (end) url += `&end_date=${end}`;
+      const res = await fetch(url, { headers: getHeaders(token) });
+      return handleResponse(res);
+    },
+
+    deletePatientPayment: async (token, id) => {
+      const res = await fetch(`${API_BASE}/finance/payments/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(token)
+      });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (res.status === 403) throw new Error('Forbidden');
+      if (!res.ok) throw new Error('Failed to delete payment');
+      return true;
+    },
+
+    getFinanceTemplate: async (token) => {
+      const res = await fetch(`${API_BASE}/finance/payments/template`, {
+        headers: getHeaders(token)
+      });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (!res.ok) throw new Error('Failed to download template');
+      return res.blob();
     }
   };
 

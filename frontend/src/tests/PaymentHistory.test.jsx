@@ -31,7 +31,7 @@ describe('PaymentHistoryTable Component', () => {
     render(<PaymentHistoryTable token="fake-token" />);
     expect(await screen.findByText(/John Doe/i)).toBeInTheDocument();
     expect(await screen.findByText(/UHID-123/i)).toBeInTheDocument();
-    expect(await screen.findByText(/1,500/i)).toBeInTheDocument();
+    expect(await screen.findAllByText(/1,500/i)).toHaveLength(2); // Bill and Due (since payments are missing in mock)
   });
 
   it('shows pagination controls', async () => {
@@ -43,7 +43,7 @@ describe('PaymentHistoryTable Component', () => {
 
   it('handles search input', async () => {
     render(<PaymentHistoryTable token="fake-token" />);
-    const searchInput = screen.getByPlaceholderText(/Search patients/i);
+    const searchInput = screen.getByPlaceholderText(/Search by patient name/i);
     fireEvent.change(searchInput, { target: { value: 'John' } });
     // Fetch should be called with query param
     await waitFor(() => {

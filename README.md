@@ -96,7 +96,8 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 7. **Stock Tracking** — Intelligent stock ledger with audit trail for every change (invoice receipts, manual adjustments, dispensing, write-offs, opening balance).
 8. **RBAC** — Role-based access: Admin, Manager, Staff with endpoint-level guards.
 9. **Unified Error Handling** — Automated database error handlers with auto-rollback and structured HTTP error mapping.
-10. **Finance Management (Feature Toggled)** — Patient payment tracking including patient identifiers, multiple services rendered, and multi-mode payment breakdown. Currently scoped behind the `FINANCE_MANAGEMENT` environment variable flag.
+10. **Finance Management (Feature Toggled)** — Patient payment tracking including patient identifiers, multiple services rendered, and multi-mode payment breakdown. Supports **Admin-only Soft Delete** with automated audit trails and summary recalculation. Currently scoped behind the `FINANCE_MANAGEMENT` flag.
+11. **Daily Finance Reporting** — Automated daily aggregation of patient counts, revenue breakdowns (per service/payment mode), and precise GST liability tracking (calculated at 5% for Medicine/Pharmacy services).
 
 ---
 
@@ -115,7 +116,7 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 | Analytics      | `/analytics`       | GET `/stats` (Dashboard KPIs)                                              |
 | Lookups        | `/lookups`        | `/status`, `/supplier-types` full CRUD                                     |
 | Users          | `/users`          | GET, POST, PUT, DELETE; PUT `/me/password`                                 |
-| Finance        | `/finance`        | GET, POST for `/payments` and `/masters` (Identifiers, Services, Modes)    |
+| Finance        | `/finance`        | GET, POST for `/payments`; `/masters` (Identifiers, Services, Modes); GET `/reports/summary` |
 
 ---
 
@@ -173,3 +174,13 @@ npx playwright test
 | Container  | Docker, Docker Compose, Nginx (frontend reverse proxy)      |
 
 **Key Architecture Patterns:** Lifespan-based startup events, Unified DB error handling with rollback, Immutable stock audit trail, Atomic dispensing transactions, Automated request observability middleware.
+---
+ 
+ ## Development Utilities
+ 
+ ### Finance Data Reset
+ To clear all patient payment transaction data and daily summaries during development:
+ - **Windows (PowerShell)**: `./reset_finance.ps1`
+ - **Linux/macOS**: `bash reset_finance.sh`
+ 
+ This will truncate all payment tables and reset ID sequences while preserving master data.

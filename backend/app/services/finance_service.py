@@ -1,4 +1,5 @@
 import datetime
+from datetime import date
 import io
 import pandas as pd
 from sqlalchemy import func
@@ -6,17 +7,29 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from app import models, schemas
 from app.core.logging_config import logger
+from app.utils import FinanceModuleError, ValidationError, ResourceNotFoundError
 
 class FinanceService:
     @staticmethod
     def record_payment(
         db: Session,
         payment_in: schemas.PatientPaymentCreate,
-        user_id: int
+        user_id: int,
+        recalculate: bool = True
     ) -> models.PatientPayment:
         """
         Atomically records a patient payment with nested identifiers and services.
         """
+        # Security: Prevent negative amounts
+        if payment_in.total_amount < 0:
+            raise ValidationError("Total amount cannot be negative")
+        
+        for srv in payment_in.services:
+            if srv.amount < 0:
+                raise ValidationError(f"Service amount for ID {srv.service_id} cannot be negative")
+
+        logger.info(f"Finance: Recording payment for {payment_in.patient_name} by user {user_id}")
+
         # 1. Create header
         db_payment = models.PatientPayment(
             patient_name=payment_in.patient_name.strip(),
@@ -41,7 +54,7 @@ class FinanceService:
             )
             db.add(db_ident)
 
-        # 3. Services with individual amounts
+        # 3. Services
         for srv_in in payment_in.services:
             db_srv = models.PatientPaymentService(
                 patient_payment_id=db_payment.id,
@@ -50,7 +63,7 @@ class FinanceService:
             )
             db.add(db_srv)
 
-        # 4. Aggregate Payments (linked directly to header)
+        # 4. Payments
         for pay_val_in in payment_in.payments:
             db_val = models.PatientPaymentValue(
                 patient_payment_id=db_payment.id,
@@ -60,181 +73,320 @@ class FinanceService:
                 modified_by=user_id,
             )
             db.add(db_val)
+        
+        # 4.5. Calculate Status
+        total_paid = sum(p.value for p in payment_in.payments)
+        db_payment.payment_status = FinanceService._determine_payment_status(payment_in.total_amount, total_paid, payment_in.free_flag)
+
+        # 5. Trigger Summary Recalculation
+        if recalculate:
+            db.flush()
+            FinanceService.recalculate_daily_summary(db, payment_in.payment_date)
 
         return db_payment
 
     @staticmethod
+    def _determine_payment_status(total_bill: float, total_paid: float, is_free: bool) -> str:
+        if is_free:
+            return "PAID"
+        if total_paid >= total_bill:
+            return "PAID"
+        if total_paid > 0:
+            return "PARTIAL"
+        return "DUE"
+
+    @staticmethod
     def process_bulk_upload(db: Session, df: Any, user_id: int) -> Dict[str, Any]:
         """
-        Processes a dataframe of payment records.
-        Groups rows by (Date, Patient Name, Token No) to create a single payment header.
+        Processes a columnar dataframe of payment records.
         """
-        # Pre-fetch master data for lookup
-        idents = {i.id_name.lower().strip(): i.id for i in db.query(models.PatientIdentifier).all()}
-        services = {s.service_name.lower().strip(): s.id for s in db.query(models.PatientService).all()}
-        modes = {m.mode.lower().strip(): m.id for m in db.query(models.PaymentModeMaster).all()}
+        # 1. Pre-fetch master data and normalize headers
+        masters = FinanceService._load_bulk_masters(db)
+        df.columns = [c.strip() for c in df.columns]
+        norm_cols = [c.lower() for c in df.columns]
+
+        # Security check: Ensure basic required columns exist
+        required_cols = ["date", "patient name"]
+        for rc in required_cols:
+            if rc not in norm_cols:
+                raise ValidationError(f"Missing required bulk column: {rc.title()}")
 
         success_count = 0
         errors = []
+        processed_dates = set()
 
-        # Standardize columns
-        df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
-        
-        # Grouping logic
-        # We group by date, patient_name, and token_no (if exists)
-        df['token_no'] = df.get('token_no', 0)
-        grouped = df.groupby(['date', 'patient_name', 'token_no'])
-
-        for (p_date, p_name, p_token), group in grouped:
+        for idx, row in df.iterrows():
             try:
-                # Prepare identifiers (unique per patient-day)
-                patient_idents = []
-                if 'identifier_type' in group.columns and 'id_value' in group.columns:
-                    for _, row in group[['identifier_type', 'id_value']].drop_duplicates().iterrows():
-                        if pd.isna(row['identifier_type']) or not str(row['identifier_type']).strip():
-                            continue
-                        type_name = str(row['identifier_type']).lower().strip()
-                        if type_name in idents:
-                            patient_idents.append({
-                                "identifier_id": idents[type_name],
-                                "id_value": str(row['id_value'])
-                            })
-
-                # Prepare unique services and payments for this group
-                patient_services_map = {}
-                patient_payments_map = {}
+                payment_in = FinanceService._map_row_to_schema(row, norm_cols, masters)
                 
-                for _, row in group.iterrows():
-                    # Handle Service
-                    srv_name = str(row.get('service_name', '')).lower().strip()
-                    if srv_name and srv_name in services:
-                        srv_id = services[srv_name]
-                        srv_amt = float(row.get('service_amount') if 'service_amount' in row else row.get('amount', 0))
-                        if srv_id not in patient_services_map:
-                            patient_services_map[srv_id] = 0
-                        patient_services_map[srv_id] += srv_amt
-                    elif srv_name:
-                        raise ValueError(f"Service '{row.get('service_name')}' not found.")
+                # Validation: Services vs Payments (OWASP A04: Insecure Design)
+                total_paid = sum(p.value for p in payment_in.payments)
+                if abs(total_paid - payment_in.total_amount) > 0.01 and total_paid > 0:
+                    raise ValidationError(f"Balance mismatch: Bill (₹{payment_in.total_amount}) vs Paid (₹{total_paid})")
 
-                    # Handle Payment
-                    mode_name = str(row.get('payment_mode', '')).lower().strip()
-                    if mode_name and mode_name in modes:
-                        m_id = modes[mode_name]
-                        p_amt = float(row.get('payment_amount') if 'payment_amount' in row else row.get('amount', 0))
-                        if m_id not in patient_payments_map:
-                            patient_payments_map[m_id] = 0
-                        patient_payments_map[m_id] += p_amt
-                    elif mode_name:
-                        raise ValueError(f"Payment Mode '{row.get('payment_mode')}' not found.")
-
-                # Convert maps to list of dicts for schema
-                patient_services = [{"service_id": sid, "amount": amt} for sid, amt in patient_services_map.items()]
-                patient_payments = [{"payment_mode_id": mid, "value": val} for mid, val in patient_payments_map.items()]
-
-                # Calculate totals
-                # Total amount should be sum of services
-                total_amount = sum(s["amount"] for s in patient_services)
-                gst_amount = sum(float(row.get('gst', 0)) for _, row in group.iterrows())
-
-                payment_in = schemas.PatientPaymentCreate(
-                    patient_name=p_name,
-                    payment_date=pd.to_datetime(p_date).date(),
-                    total_amount=total_amount,
-                    gst_amount=gst_amount,
-                    token_no=int(p_token) if p_token else None,
-                    identifiers=patient_idents,
-                    services=patient_services,
-                    payments=patient_payments
-                )
-
-                FinanceService.record_payment(db, payment_in, user_id)
+                FinanceService.record_payment(db, payment_in, user_id, recalculate=False)
+                processed_dates.add(payment_in.payment_date)
                 success_count += 1
 
             except Exception as e:
-                db.rollback()
-                error_info = {"date": p_date, "patient_name": p_name, "token_no": p_token, "error_reason": str(e)}
-                errors.append(error_info)
-                continue
+                import traceback
+                logger.error(f"Bulk row {idx+2} failed: {str(e)}\n{traceback.format_exc()}")
+                errors.append({
+                    "row": idx + 2,
+                    "patient_name": str(row.get("Patient Name", "Unknown")),
+                    "error_reason": str(e)
+                })
+        
+        # Final Recalculations
+        for d in processed_dates:
+            FinanceService.recalculate_daily_summary(db, d)
+
+        return {"success_count": success_count, "errors": errors}
+
+    @staticmethod
+    def _load_bulk_masters(db: Session) -> Dict[str, Dict[str, int]]:
+        active_idents = db.query(models.PatientIdentifier).all()
+        active_services = db.query(models.PatientService).all()
+        active_modes = db.query(models.PaymentModeMaster).all()
         
         return {
-            "success_count": success_count,
-            "errors": errors
+            "idents": {i.id_name.lower().strip(): i.id for i in active_idents},
+            "services": {s.service_name.lower().strip(): s.id for s in active_services},
+            "modes": {m.mode.lower().strip(): m.id for m in active_modes}
         }
 
     @staticmethod
-    def get_dashboard_stats(db: Session) -> Dict[str, Any]:
+    def _map_row_to_schema(row: Any, norm_cols: List[str], masters: Dict[str, Any]) -> schemas.PatientPaymentCreate:
+        p_name = row.get("Patient Name")
+        p_date = row.get("Date")
+        if not p_name or pd.isna(p_name):
+            raise ValidationError("Patient Name is missing")
+        if not p_date or pd.isna(p_date):
+            raise ValidationError("Date is missing")
+
+        # 1. Identifiers
+        patient_idents = []
+        ident_type = str(row.get("Identifier Type", "")).lower().strip()
+        ident_val = str(row.get("ID Value", "")).strip()
+        if ident_type in masters["idents"] and ident_val:
+            patient_idents.append({"identifier_id": masters["idents"][ident_type], "id_value": ident_val})
+
+        # 2. Services
+        patient_services = []
+        for col_name, s_id in masters["services"].items():
+            if col_name in norm_cols:
+                val = row.iloc[norm_cols.index(col_name)]
+                amt = float(val) if not pd.isna(val) else 0
+                if amt > 0:
+                    patient_services.append({"service_id": s_id, "amount": amt})
+
+        # 3. Payments
+        patient_payments = []
+        for mode_name, m_id in masters["modes"].items():
+            if mode_name in norm_cols:
+                val = row.iloc[norm_cols.index(mode_name)]
+                val_amt = float(val) if not pd.isna(val) else 0
+                if val_amt > 0:
+                    patient_payments.append({"payment_mode_id": m_id, "value": val_amt})
+
+        total_amount = sum(s["amount"] for s in patient_services)
+        p_token = row.get("Token No")
+        
+        return schemas.PatientPaymentCreate(
+            patient_name=str(p_name),
+            payment_date=pd.to_datetime(p_date, dayfirst=True).date(),
+            total_amount=total_amount,
+            gst_amount=float(row.get("GST", 0)) if not pd.isna(row.get("GST")) else 0,
+            token_no=int(p_token) if p_token and not pd.isna(p_token) else None,
+            notes=str(row.get("Notes", "")) if not pd.isna(row.get("Notes")) else None,
+            free_flag=(total_amount == 0),
+            identifiers=patient_idents,
+            services=patient_services,
+            payments=patient_payments
+        )
+
+    @staticmethod
+    def get_dashboard_stats(db: Session, start_date: date = None, end_date: date = None) -> Dict[str, Any]:
         """
         Aggregates financial data for the dashboard.
         """
-        today = datetime.date.today()
+        today = date.today()
         first_day_of_month = today.replace(day=1)
+        
+        # Helper for basic period stats
+        kpi_stats = FinanceService._get_kpi_metrics(db, today)
+        
+        range_start = start_date or first_day_of_month
+        range_end = end_date or today
+        
+        return {
+            **kpi_stats,
+            "service_distribution": FinanceService._get_service_distribution(db, range_start, range_end),
+            "payment_mode_distribution": FinanceService._get_payment_mode_distribution(db, range_start, range_end),
+            "recent_trends": FinanceService._get_recent_trends(db, range_start, range_end)
+        }
 
-        # 1. Total Income Today
-        total_today = db.query(func.sum(models.PatientPayment.total_amount))\
-            .filter(models.PatientPayment.payment_date == today).scalar() or 0.0
+    @staticmethod
+    def _get_kpi_metrics(db: Session, today: date) -> Dict[str, Any]:
+        yesterday = today - datetime.timedelta(days=1)
+        first_of_month = today.replace(day=1)
+        
+        def get_day_total(d: date):
+            return db.query(func.sum(models.PatientPayment.total_amount))\
+                .filter(models.PatientPayment.payment_date == d, models.PatientPayment.is_deleted == False).scalar() or 0.0
 
-        # 2. Total Income Month
+        def get_day_count(d: date):
+            return db.query(models.PatientPayment)\
+                .filter(models.PatientPayment.payment_date == d, models.PatientPayment.is_deleted == False).count()
+
+        total_today = get_day_total(today)
+        total_yesterday = get_day_total(yesterday)
+        count_today = get_day_count(today)
+        count_yesterday = get_day_count(yesterday)
+
+        # Month-to-Date
         total_month = db.query(func.sum(models.PatientPayment.total_amount))\
-            .filter(models.PatientPayment.payment_date >= first_day_of_month).scalar() or 0.0
-
-        # 3. Patient Count Today
-        patient_count_today = db.query(models.PatientPayment)\
-            .filter(models.PatientPayment.payment_date == today).count()
-
-        # 4. Average Ticket Size
-        avg_ticket = total_today / patient_count_today if patient_count_today > 0 else 0.0
-
-        # 5. Service Distribution
-        # We join ptnt_pmnt_x_ptnt_srvcs with patient_services
-        service_data = db.query(
-            models.PatientService.service_name,
-            func.sum(models.PatientPaymentService.amount).label("total"),
-            func.count(models.PatientPaymentService.id).label("count")
-        ).join(models.PatientPaymentService)\
-         .join(models.PatientPayment)\
-         .filter(models.PatientPayment.payment_date >= first_day_of_month)\
-         .group_by(models.PatientService.service_name).all()
+            .filter(models.PatientPayment.payment_date >= first_of_month, models.PatientPayment.is_deleted == False).scalar() or 0.0
+            
+        # Prev Month MTD
+        last_month_start = (first_of_month - datetime.timedelta(days=1)).replace(day=1)
+        days_passed = (today - first_of_month).days
+        comp_prev_month_end = min(last_month_start + datetime.timedelta(days=days_passed), first_of_month - datetime.timedelta(days=1))
         
-        service_dist = [
-            {"service_name": name, "total_amount": float(total), "count": count}
-            for name, total, count in service_data
-        ]
-
-        # 6. Payment Mode Distribution
-        mode_data = db.query(
-            models.PaymentModeMaster.mode,
-            func.sum(models.PatientPaymentValue.value).label("total"),
-            func.count(models.PatientPaymentValue.id).label("count")
-        ).join(models.PatientPaymentValue)\
-         .join(models.PatientPayment)\
-         .filter(models.PatientPayment.payment_date >= first_day_of_month)\
-         .group_by(models.PaymentModeMaster.mode).all()
-        
-        mode_dist = [
-            {"mode_name": name, "total_value": float(total), "count": count}
-            for name, total, count in mode_data
-        ]
-
-        # 7. Recent Trends (Last 7 days)
-        last_7_days = today - datetime.timedelta(days=6)
-        trends_data = db.query(
-            models.PatientPayment.payment_date,
-            func.sum(models.PatientPayment.total_amount).label("total")
-        ).filter(models.PatientPayment.payment_date >= last_7_days)\
-         .group_by(models.PatientPayment.payment_date)\
-         .order_by(models.PatientPayment.payment_date).all()
-        
-        trends = [
-            {"date": d.strftime("%Y-%m-%d"), "amount": float(t)}
-            for d, t in trends_data
-        ]
+        total_prev_mtd = db.query(func.sum(models.PatientPayment.total_amount))\
+            .filter(
+                models.PatientPayment.payment_date >= last_month_start,
+                models.PatientPayment.payment_date <= comp_prev_month_end,
+                models.PatientPayment.is_deleted == False
+            ).scalar() or 0.0
 
         return {
             "total_income_today": float(total_today),
+            "total_income_yesterday": float(total_yesterday),
             "total_income_month": float(total_month),
-            "patient_count_today": patient_count_today,
-            "avg_ticket_size": float(avg_ticket),
-            "service_distribution": service_dist,
-            "payment_mode_distribution": mode_dist,
-            "recent_trends": trends
+            "total_income_prev_month_mtd": float(total_prev_mtd),
+            "patient_count_today": count_today,
+            "patient_count_yesterday": count_yesterday,
+            "avg_ticket_size": float(total_today / count_today) if count_today > 0 else 0.0,
+            "avg_ticket_yesterday": float(total_yesterday / count_yesterday) if count_yesterday > 0 else 0.0,
         }
+
+    @staticmethod
+    def _get_service_distribution(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
+        data = db.query(
+            models.PatientService.service_name,
+            func.sum(models.PatientPaymentService.amount).label("total"),
+            func.count(models.PatientPaymentService.id).label("count")
+        ).join(models.PatientPaymentService).join(models.PatientPayment)\
+         .filter(models.PatientPayment.payment_date >= start, models.PatientPayment.payment_date <= end, models.PatientPayment.is_deleted == False)\
+         .group_by(models.PatientService.service_name).all()
+        
+        return [{"service_name": n, "total_amount": float(t), "count": c} for n, t, c in data]
+
+    @staticmethod
+    def _get_payment_mode_distribution(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
+        data = db.query(
+            models.PaymentModeMaster.mode,
+            func.sum(models.PatientPaymentValue.value).label("total"),
+            func.count(models.PatientPaymentValue.id).label("count")
+        ).join(models.PatientPaymentValue).join(models.PatientPayment)\
+         .filter(models.PatientPayment.payment_date >= start, models.PatientPayment.payment_date <= end, models.PatientPayment.is_deleted == False)\
+         .group_by(models.PaymentModeMaster.mode).all()
+        
+        return [{"mode_name": n, "total_value": float(t), "count": c} for n, t, c in data]
+
+    @staticmethod
+    def _get_recent_trends(db: Session, start: date, end: date) -> List[Dict[str, Any]]:
+        # Trend is usually 7 days unless override provided
+        trend_start = start if start > (end - datetime.timedelta(days=6)) else (end - datetime.timedelta(days=6))
+        data = db.query(
+            models.PatientPayment.payment_date,
+            func.sum(models.PatientPayment.total_amount).label("total")
+        ).filter(models.PatientPayment.payment_date >= trend_start, models.PatientPayment.payment_date <= end, models.PatientPayment.is_deleted == False)\
+         .group_by(models.PatientPayment.payment_date).order_by(models.PatientPayment.payment_date).all()
+        
+        return [{"date": d.strftime("%Y-%m-%d"), "amount": float(t)} for d, t in data]
+
+    @staticmethod
+    def recalculate_daily_summary(db: Session, summary_date: date) -> models.DailyFinanceSummary:
+        """
+        Recalculates and updates the daily summary record for a specific date.
+        """
+        logger.info(f"Summary: Recalculating totals for {summary_date}")
+        
+        try:
+            records = db.query(models.PatientPayment).filter(
+                models.PatientPayment.payment_date == summary_date,
+                models.PatientPayment.is_deleted == False
+            ).all()
+            
+            p_count = len(records)
+            revenue = sum(r.total_amount for r in records)
+            collected = 0.0
+            gst_liability = 0.0
+            s_map = {}
+            p_map = {}
+
+            for r in records:
+                for s_link in r.services:
+                    s_name = s_link.service.service_name
+                    s_amt = s_link.amount
+                    s_map[s_name] = s_map.get(s_name, 0.0) + s_amt
+                    if s_name.lower() in ["pharmacy", "medicine"]:
+                        gst_liability += (s_amt * 0.05)
+                
+                for p_link in r.payments:
+                    collected += p_link.value
+                    p_mode = p_link.payment_mode.mode
+                    p_map[p_mode] = p_map.get(p_mode, 0.0) + p_link.value
+
+            db_summary = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.summary_date == summary_date).first()
+            if not db_summary:
+                db_summary = models.DailyFinanceSummary(summary_date=summary_date)
+                db.add(db_summary)
+
+            db_summary.patient_count = p_count
+            db_summary.total_revenue = revenue
+            db_summary.total_collected = collected
+            db_summary.total_gst = gst_liability
+            db_summary.service_breakdown = s_map
+            db_summary.payment_breakdown = p_map
+            db_summary.last_updated = datetime.datetime.now(datetime.timezone.utc)
+
+            db.commit()
+            return db_summary
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Summary: Failed to update {summary_date}: {str(e)}")
+            raise FinanceModuleError(f"Failed to recalculate daily summary: {str(e)}")
+
+    @staticmethod
+    def soft_delete_payment(db: Session, payment_id: int, user_id: int) -> bool:
+        """
+        Performs a soft delete on a payment record.
+        """
+        logger.info(f"Finance: Admin {user_id} soft-deleting payment {payment_id}")
+        
+        try:
+            db_obj = db.query(models.PatientPayment).filter(
+                models.PatientPayment.id == payment_id,
+                models.PatientPayment.is_deleted == False
+            ).first()
+            
+            if not db_obj:
+                return False
+
+            p_date = db_obj.payment_date
+            db_obj.is_deleted = True
+            db_obj.deleted_by = user_id
+            db_obj.deleted_at = datetime.datetime.now(datetime.timezone.utc)
+            
+            db.commit()
+            FinanceService.recalculate_daily_summary(db, p_date)
+            return True
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Finance: Failed to soft-delete payment {payment_id}: {str(e)}")
+            raise FinanceModuleError(f"Failed to soft-delete payment: {str(e)}")

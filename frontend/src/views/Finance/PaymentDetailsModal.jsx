@@ -25,7 +25,22 @@ const PaymentDetailsModal = ({ payment, masters, onClose }) => {
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-800 tracking-tight">Payment Details</h2>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Transaction #{payment.id}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Transaction #{payment.id}</p>
+                {(() => {
+                  const status = payment.payment_status || 'PAID';
+                  const colors = {
+                    'PAID': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                    'PARTIAL': 'bg-amber-50 text-amber-700 border-amber-100',
+                    'DUE': 'bg-rose-50 text-rose-700 border-rose-100'
+                  };
+                  return (
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider ${colors[status]}`}>
+                      {status}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           </div>
           <button 
@@ -129,16 +144,41 @@ const PaymentDetailsModal = ({ payment, masters, onClose }) => {
             </div>
           )}
 
-          {/* Final Total */}
-          <div className="bg-slate-900 rounded-2xl p-6 flex justify-between items-center shadow-xl shadow-slate-200">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em]">Total Transaction Amount</span>
-              <div className="flex items-center gap-2 text-emerald-400">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-xs font-bold">Payment Verified</span>
+          {/* Final Total & Balance */}
+          <div className="bg-slate-900 rounded-2xl p-6 space-y-4 shadow-xl shadow-slate-200">
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em]">Total Bill Amount</span>
+                <div className="flex items-center gap-2">
+                  {payment.payment_status === 'PAID' ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-emerald-400">Fully Settled</span>
+                    </>
+                  ) : (
+                    <>
+                      <Activity className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-bold text-amber-400">Action Required</span>
+                    </>
+                  )}
+                </div>
               </div>
+              <div className="text-3xl font-black text-white tracking-tight">₹{payment.total_amount?.toLocaleString()}</div>
             </div>
-            <div className="text-3xl font-black text-white tracking-tight">₹{payment.total_amount?.toLocaleString()}</div>
+
+            {(() => {
+              const totalPaid = payment.payments?.reduce((sum, p) => sum + p.value, 0) || 0;
+              const balance = payment.total_amount - totalPaid;
+              if (balance > 0.01 && !payment.free_flag) {
+                return (
+                  <div className="pt-4 border-t border-white/10 flex justify-between items-center text-rose-400">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Remaining Balance Due</span>
+                    <span className="text-xl font-black">₹{balance.toLocaleString()}</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
 

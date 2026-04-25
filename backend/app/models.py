@@ -9,7 +9,7 @@ Defines the full relational schema, including:
   - Stock ledger (MedicineStock) and immutable audit trail (StockAdjustment)
   - Daily patient dispensing records
 """
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Boolean, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from .database import Base
 import datetime
@@ -407,11 +407,17 @@ class PatientPayment(Base):
     notes = Column(String, nullable=True)
     free_flag = Column(Boolean, nullable=False, default=False)
     token_no = Column(Integer, nullable=True)
+    payment_status = Column(String, nullable=False, default="PAID") # PAID, PARTIAL, DUE
     
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
     modified_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     modified_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+    
+    # Soft Delete Fields
+    is_deleted = Column(Boolean, default=False, index=True)
+    deleted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     creator = relationship("User", foreign_keys=[created_by])
     modifier = relationship("User", foreign_keys=[modified_by])
@@ -455,3 +461,17 @@ class PatientPaymentValue(Base):
     patient_payment = relationship("PatientPayment", back_populates="payments")
     payment_mode = relationship("PaymentModeMaster")
     modifier = relationship("User", foreign_keys=[modified_by])
+
+class DailyFinanceSummary(Base):
+    """Aggregated daily financial summary for reporting."""
+    __tablename__ = "daily_finance_summary"
+    id = Column(Integer, primary_key=True, index=True)
+    summary_date = Column(Date, nullable=False, unique=True, index=True)
+    patient_count = Column(Integer, default=0)
+    total_revenue = Column(Float, default=0.0)
+    total_collected = Column(Float, default=0.0)
+    total_gst = Column(Float, default=0.0)
+    # JSON breakdowns for flexibility
+    service_breakdown = Column(JSON, default=dict) # {service_name: total_amount}
+    payment_breakdown = Column(JSON, default=dict) # {mode_name: total_value}
+    last_updated = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))

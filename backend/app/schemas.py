@@ -5,7 +5,7 @@ Used for request validation (Create/Update) and response serialization (Schema).
 import datetime
 from enum import Enum
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 class InvoiceStatus(str, Enum):
     """Possible statuses for a purchase invoice."""
@@ -604,6 +604,7 @@ class PatientPaymentBase(BaseModel):
     notes: Optional[str] = None
     free_flag: bool = False
     token_no: Optional[int] = None
+    payment_status: str = "PAID"
 
 class PatientPaymentCreate(PatientPaymentBase):
     identifiers: List[PatientPaymentIdentifierCreate] = []
@@ -657,9 +658,38 @@ class DailyTrend(BaseModel):
 
 class FinanceDashboardStats(BaseModel):
     total_income_today: float
+    total_income_yesterday: float
     total_income_month: float
+    total_income_prev_month_mtd: float
     patient_count_today: int
+    patient_count_yesterday: int
     avg_ticket_size: float
+    avg_ticket_yesterday: float
     service_distribution: List[ServiceIncome]
     payment_mode_distribution: List[PaymentModeIncome]
     recent_trends: List[DailyTrend]
+
+class DailyFinanceSummarySchema(BaseModel):
+    id: Optional[int] = None
+    summary_date: datetime.date
+    patient_count: int
+    total_revenue: float
+    total_collected: float
+    total_gst: float
+    service_breakdown: Dict[str, float]
+    payment_breakdown: Dict[str, float]
+    last_updated: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class GrandTotalSummary(BaseModel):
+    patient_count: int = 0
+    total_revenue: float = 0.0
+    total_collected: float = 0.0
+    total_gst: float = 0.0
+    service_breakdown: Dict[str, float] = {}
+    payment_breakdown: Dict[str, float] = {}
+
+class PaginatedDailySummary(BaseModel):
+    total: int
+    items: List[DailyFinanceSummarySchema]
+    grand_total: Optional[GrandTotalSummary] = None
