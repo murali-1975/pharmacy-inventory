@@ -1,17 +1,9 @@
 # ==============================================================================
 # Pharmacy Inventory System - Cloud Build CI/CD Pipeline
-# 
-# This configuration automates:
-# 1. Running backend unit tests
-# 2. Building Docker images for Backend and Frontend
-# 3. Pushing images to Artifact Registry (asia-south1)
-# 4. Running Alembic Database Migrations
-# 5. Deploying/Updating Cloud Run services
 # ==============================================================================
 
 steps:
   # 1. Run Backend Unit Tests
-  # We use the python builder to ensure the code passes before imaging.
   - name: 'python:3.11'
     id: 'test-backend'
     entrypoint: 'bash'
@@ -60,23 +52,16 @@ steps:
     waitFor: ['build-frontend']
 
   # 6. Run Database Migrations
-  # This step ensures the production schema is updated before the new code is deployed.
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # We use the native secretEnv to inject the DATABASE_URL securely.
+  - name: '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
     id: 'run-migrations'
-    entrypoint: 'bash'
+    entrypoint: 'sh'
     args:
       - '-c'
       - |
-        echo "🔄 Fetching DB Credentials..."
-        DB_URL=$(gcloud secrets versions access latest --secret="PHARMACY_DB_URL")
-        
         echo "🚀 Running Alembic Migrations..."
-        # We run the migration using the image we just pushed to ensure consistency.
-        docker run --rm \
-          -e DATABASE_URL=$$DB_URL \
-          -e SECRET_KEY="migration-temp-key" \
-          '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA' \
-          alembic upgrade head
+        alembic upgrade head
+    secretEnv: ['DATABASE_URL']
     waitFor: ['push-backend']
 
   # 7. Deploy Backend to Cloud Run
@@ -92,7 +77,6 @@ steps:
           TARGET_SERVICE="pharmacy-backend"
         fi
         
-        echo "🚀 Deploying to $$TARGET_SERVICE..."
         gcloud run deploy $$TARGET_SERVICE \
           --image '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA' \
           --region '$_REGION' \
@@ -117,12 +101,7 @@ steps:
           TARGET_F_SERVICE="pharmacy-frontend"
         fi
 
-        echo "🔍 Discovering Backend URL for $$TARGET_B_SERVICE..."
         B_URL=$$(gcloud run services describe $$TARGET_B_SERVICE --region $_REGION --format='value(status.url)')
-        if [ -z "$$B_URL" ]; then echo "❌ Error: Could not find backend URL"; exit 1; fi
-        echo "✅ Detected Backend URL: $$B_URL"
-        
-        echo "🚀 Deploying to $$TARGET_F_SERVICE..."
         gcloud run deploy $$TARGET_F_SERVICE \
           --image "$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA" \
           --region "$_REGION" \
@@ -131,12 +110,17 @@ steps:
           --port 80
     waitFor: ['push-frontend', 'deploy-backend']
 
-# Images to be tracked in the build history
+# Securely inject the database URL from Secret Manager
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/PHARMACY_DB_URL/versions/latest
+      env: 'DATABASE_URL'
+
+# Images to be tracked
 images:
   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend:$_COMMIT_SHA'
 
-# Default substitutions
 substitutions:
   _REGION: 'asia-south1'
   _REPO_NAME: 'pharmacy-app'
