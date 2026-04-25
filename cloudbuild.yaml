@@ -64,9 +64,9 @@ steps:
           --image '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA' \
           --region '$_REGION' \
           --set-secrets 'DATABASE_URL=PHARMACY_DB_URL:latest,SECRET_KEY=PHARMACY_SECRET_KEY:latest' \
-          --add-cloudsql-instances '$PROJECT_ID:$_REGION:$_DB_INSTANCE' \
-          --command 'alembic' \
-          --args '-c,/app/alembic.ini,upgrade,head' \
+          --set-cloudsql-instances '$PROJECT_ID:$_REGION:$_DB_INSTANCE' \
+          --command "alembic" \
+          --args="-c,/app/alembic.ini,upgrade,head" \
           --execute-now \
           --wait
     waitFor: ['push-backend']
