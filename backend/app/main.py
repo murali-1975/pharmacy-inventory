@@ -24,7 +24,8 @@ from .core.logging_config import LoggingMiddleware, logger
 from . import seed
 
 # Initialize database tables synchronously before app startup
-models.Base.metadata.create_all(bind=database.engine)
+# Database schema is now managed by Alembic migrations.
+# models.Base.metadata.create_all(bind=database.engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
