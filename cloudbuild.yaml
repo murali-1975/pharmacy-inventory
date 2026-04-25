@@ -60,7 +60,8 @@ steps:
       - '-c'
       - |
         echo "🚀 Running Alembic Migrations..."
-        alembic upgrade head
+        # Explicitly point to the config file in the container's /app directory
+        alembic -c /app/alembic.ini upgrade head
     secretEnv: ['DATABASE_URL']
     waitFor: ['push-backend']
 
