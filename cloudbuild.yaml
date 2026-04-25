@@ -51,20 +51,24 @@ steps:
     args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/frontend', '--all-tags']
     waitFor: ['build-frontend']
 
-  # 6. Run Database Migrations
-  # We use the native secretEnv to inject the DATABASE_URL securely.
-  - name: '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA'
+  # 6. Run Database Migrations (via Cloud Run Job)
+  # This is the most robust way to run migrations in GCP.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'run-migrations'
-    entrypoint: 'sh'
+    entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "🚀 Running Alembic Migrations..."
-        # Explicitly point to the config file in the container's /app directory
-        alembic -c /app/alembic.ini upgrade head
-    env:
-      - 'SECRET_KEY=migration-dummy-key'
-    secretEnv: ['DATABASE_URL']
+        echo "🚀 Deploying Migration Job..."
+        gcloud run jobs deploy migration-job \
+          --image '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/backend:$_COMMIT_SHA' \
+          --region '$_REGION' \
+          --set-secrets 'DATABASE_URL=PHARMACY_DB_URL:latest,SECRET_KEY=PHARMACY_SECRET_KEY:latest' \
+          --add-cloudsql-instances '$PROJECT_ID:$_REGION:$_DB_INSTANCE' \
+          --command 'alembic' \
+          --args '-c,/app/alembic.ini,upgrade,head' \
+          --execute-now \
+          --wait
     waitFor: ['push-backend']
 
   # 7. Deploy Backend to Cloud Run
@@ -112,12 +116,6 @@ steps:
           --allow-unauthenticated \
           --port 80
     waitFor: ['push-frontend', 'deploy-backend']
-
-# Securely inject the database URL from Secret Manager
-availableSecrets:
-  secretManager:
-    - versionName: projects/$PROJECT_ID/secrets/PHARMACY_DB_URL/versions/latest
-      env: 'DATABASE_URL'
 
 # Images to be tracked
 images:
