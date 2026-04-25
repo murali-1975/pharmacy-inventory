@@ -62,6 +62,8 @@ steps:
         echo "🚀 Running Alembic Migrations..."
         # Explicitly point to the config file in the container's /app directory
         alembic -c /app/alembic.ini upgrade head
+    env:
+      - 'SECRET_KEY=migration-dummy-key'
     secretEnv: ['DATABASE_URL']
     waitFor: ['push-backend']
 
