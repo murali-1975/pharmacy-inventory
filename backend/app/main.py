@@ -37,6 +37,8 @@ async def lifespan(app: FastAPI):
         db = database.SessionLocal()
         try:
             seed.seed_database(db)
+            # Seed finance masters separately to avoid test conflicts
+            seed.seed_finance_masters(db)
         finally:
             db.close()
     yield

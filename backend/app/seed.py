@@ -59,6 +59,13 @@ def seed_database(db: Session):
         db.add(new_admin)
         db.commit()
     
+    logger.info("Core database seeding complete.")
+
+def seed_finance_masters(db: Session):
+    """
+    Seeds Finance-specific lookups (Identifiers, Services, Payment Modes, Expense Types).
+    Separated from core seed to avoid conflicts with legacy tests.
+    """
     # 4. Seed Finance Identifiers
     finance_idents = ['File No', 'Easy Clinic Reference', 'RCH ID', 'UHID']
     for ident in finance_idents:
@@ -88,4 +95,4 @@ def seed_database(db: Session):
             db.add(models.ExpenseType(name=et, is_active=True))
     
     db.commit()
-    logger.info("Database seeding check complete (including Finance Masters).")
+    logger.info("Finance master data seeding complete.")
