@@ -59,4 +59,33 @@ def seed_database(db: Session):
         db.add(new_admin)
         db.commit()
     
-    logger.info("Database seeding check complete.")
+    # 4. Seed Finance Identifiers
+    finance_idents = ['File No', 'Easy Clinic Reference', 'RCH ID', 'UHID']
+    for ident in finance_idents:
+        if not db.query(models.PatientIdentifier).filter(models.PatientIdentifier.id_name == ident).first():
+            db.add(models.PatientIdentifier(id_name=ident, is_active=True))
+
+    # 5. Seed Finance Services
+    finance_services = ['Consultation', 'Medicine', 'Scan', 'Investigation', 'Services']
+    for srv in finance_services:
+        if not db.query(models.PatientService).filter(models.PatientService.service_name == srv).first():
+            db.add(models.PatientService(service_name=srv, is_active=True))
+
+    # 6. Seed Payment Modes
+    payment_modes = ['Cash', 'UPI - (Gpay)', 'Credit Card', 'Bank Transfer']
+    for mode in payment_modes:
+        if not db.query(models.PaymentModeMaster).filter(models.PaymentModeMaster.mode == mode).first():
+            db.add(models.PaymentModeMaster(mode=mode, is_active=True))
+
+    # 7. Seed Expense Types
+    expense_types = [
+        'Pharmacy', 'Rent', 'Consumables', 'Utilities', 'Salary', 'Subscription', 
+        'Government', 'Tax', 'License', 'Maintenance', 'Petty Expense', 
+        'Insurance', 'Transport', 'Printer', 'Diagnostics', 'Loan'
+    ]
+    for et in expense_types:
+        if not db.query(models.ExpenseType).filter(models.ExpenseType.name == et).first():
+            db.add(models.ExpenseType(name=et, is_active=True))
+    
+    db.commit()
+    logger.info("Database seeding check complete (including Finance Masters).")
