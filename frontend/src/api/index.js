@@ -394,6 +394,69 @@ export const api = {
       if (res.status === 401) throw new Error('Unauthorized');
       if (!res.ok) throw new Error('Failed to download template');
       return res.blob();
+    },
+
+    // Expenses
+    saveExpense: async (token, expenseData, id = null) => {
+      const url = id ? `${API_BASE}/finance/expenses/${id}` : `${API_BASE}/finance/expenses`;
+      const res = await fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: getHeaders(token),
+        body: JSON.stringify(expenseData)
+      });
+      return handleResponse(res);
+    },
+
+    getExpenses: async (token, skip = 0, limit = 10, typeId = '', fromDate = '', toDate = '') => {
+      let url = `${API_BASE}/finance/expenses?skip=${skip}&limit=${limit}`;
+      if (typeId) url += `&expense_type_id=${typeId}`;
+      if (fromDate) url += `&from_date=${fromDate}`;
+      if (toDate) url += `&to_date=${toDate}`;
+      const res = await fetch(url, { headers: getHeaders(token) });
+      return handleResponse(res);
+    },
+
+    deleteExpense: async (token, id) => {
+      const res = await fetch(`${API_BASE}/finance/expenses/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(token)
+      });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (res.status === 403) throw new Error('Forbidden');
+      if (!res.ok) throw new Error('Failed to cancel expense');
+      return true;
+    },
+    getExpenseTemplate: async (token) => {
+      const res = await fetch(`${API_BASE}/finance/expenses/template`, {
+        headers: getHeaders(token)
+      });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (!res.ok) throw new Error('Failed to download template');
+      return res.blob();
+    },
+    uploadExpenses: async (token, formData) => {
+      const res = await fetch(`${API_BASE}/finance/expenses/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (res.status === 401) throw new Error('Unauthorized');
+      return res;
+    },
+
+    // Financial Ledger
+    getLedger: async (token, fromDate, toDate) => {
+      const url = `${API_BASE}/financials/ledger?from_date=${fromDate}&to_date=${toDate}`;
+      const res = await fetch(url, { headers: getHeaders(token) });
+      return handleResponse(res);
+    },
+
+    getLedgerExport: async (token, fromDate, toDate, format = 'excel') => {
+      const url = `${API_BASE}/financials/ledger/export?from_date=${fromDate}&to_date=${toDate}&format=${format}`;
+      const res = await fetch(url, { headers: getHeaders(token) });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (!res.ok) throw new Error('Failed to download ledger');
+      return res.blob();
     }
   };
 

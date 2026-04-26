@@ -10,14 +10,19 @@ import PaymentHistoryTable from './PaymentHistoryTable';
 import PatientPaymentForm from './PatientPaymentForm';
 import FinanceDashboard from './FinanceDashboard';
 import FinanceBulkUpload from './FinanceBulkUpload';
+import ExpenseBulkUpload from './ExpenseBulkUpload';
 import PaymentDetailsModal from './PaymentDetailsModal';
 import api from '../../api';
+import ExpenseEntry from './ExpenseEntry';
+import ExpenseHistory from './ExpenseHistory';
 
 import DailySummaryReport from './DailySummaryReport';
+import FinanceLedger from './FinanceLedger';
 
 const FinanceView = ({ token, currentUser, onUnauthorized, subTab, setActiveTab }) => {
   const [editingPayment, setEditingPayment] = useState(null);
   const [viewingPayment, setViewingPayment] = useState(null);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [masters, setMasters] = useState({ identifiers: [], services: [], payment_modes: [] });
   const [showBulkUpload, setShowBulkUpload] = useState(false);
 
@@ -81,9 +86,45 @@ const FinanceView = ({ token, currentUser, onUnauthorized, subTab, setActiveTab 
             currentUser={currentUser}
           />
         );
+      case 'expenses':
+        return showBulkUpload ? (
+          <div className="space-y-4">
+            <div className="flex justify-start">
+              <button 
+                onClick={() => setShowBulkUpload(false)}
+                className="text-sm font-bold text-slate-500 hover:text-amber-600 flex items-center gap-1 transition-colors"
+              >
+                <Plus className="w-4 h-4 rotate-45" />
+                Back to Form
+              </button>
+            </div>
+            <ExpenseBulkUpload token={token} onUnauthorized={onUnauthorized} />
+          </div>
+        ) : (
+          <ExpenseEntry 
+            token={token} 
+            initialData={editingExpense}
+            onSuccess={() => { setEditingExpense(null); setActiveTab('finance-expenses-history'); }}
+            onUnauthorized={onUnauthorized} 
+            onToggleBulk={() => setShowBulkUpload(true)}
+            currentUser={currentUser} 
+          />
+        );
+      case 'expenses-history':
+        return (
+          <ExpenseHistory 
+            token={token} 
+            onEdit={(exp) => { setEditingExpense(exp); setActiveTab('finance-expenses'); }}
+            onUnauthorized={onUnauthorized} 
+            currentUser={currentUser} 
+          />
+        );
       case 'masters':
         if (currentUser?.role !== 'Admin') return <PaymentHistoryTable {...commonProps} />;
         return <MasterDataManagement token={token} onUnauthorized={onUnauthorized} />;
+      case 'ledger':
+        if (currentUser?.role !== 'Admin') return <PaymentHistoryTable {...commonProps} />;
+        return <FinanceLedger token={token} onUnauthorized={onUnauthorized} />;
       default:
         return <FinanceDashboard token={token} onUnauthorized={onUnauthorized} />;
     }

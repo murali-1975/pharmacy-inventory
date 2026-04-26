@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Download
 } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import api from '../../api';
 
 const DailySummaryReport = ({ token, onUnauthorized }) => {
@@ -131,10 +132,12 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                     Payment Modes
                   </div>
                 </th>
-                <th rowSpan="2" className="px-6 py-4 text-right bg-amber-50/30 text-amber-700 border-l border-slate-100">GST</th>
+                <th rowSpan="2" className="px-6 py-4 text-right bg-slate-50/50 text-slate-500 border-l border-slate-100">Sales GST</th>
                 <th rowSpan="2" className="px-6 py-4 text-right bg-indigo-50/30 text-indigo-900 border-l border-slate-100 font-black">Revenue</th>
                 <th rowSpan="2" className="px-6 py-4 text-right bg-emerald-50/30 text-emerald-900 border-l border-slate-100 font-black">Collected</th>
-                <th rowSpan="2" className="px-6 py-4 text-right bg-rose-50/30 text-rose-900 border-l border-slate-100 font-black">Gap</th>
+                <th rowSpan="2" className="px-6 py-4 text-right bg-rose-50/30 text-rose-900 border-l border-slate-100 font-black">Expenses</th>
+                <th rowSpan="2" className="px-6 py-4 text-right bg-amber-50/30 text-amber-700 border-l border-slate-100">Exp GST</th>
+                <th rowSpan="2" className="px-6 py-4 text-right bg-indigo-900 text-white border-l border-slate-100 font-black">Net</th>
               </tr>
               <tr className="bg-slate-50/50 text-slate-400 text-[9px] font-bold uppercase tracking-wider border-b border-slate-100">
                 {/* Services Sub-headers */}
@@ -170,7 +173,7 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                 <tr key={item.summary_date} className="hover:bg-slate-50/50 transition-colors group">
                   {/* Date */}
                   <td className="px-6 py-4 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    {new Date(item.summary_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {formatDate(item.summary_date)}
                   </td>
                   
                   {/* Patients */}
@@ -200,8 +203,8 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                     );
                   })}
 
-                  {/* GST */}
-                  <td className="px-6 py-4 text-right font-bold text-amber-600 bg-amber-50/10 border-l border-slate-100">
+                  {/* Sales GST */}
+                  <td className="px-6 py-4 text-right font-bold text-slate-500 bg-slate-50/10 border-l border-slate-100">
                     {item.total_gst > 0 ? formatCurrency(item.total_gst) : '-'}
                   </td>
 
@@ -215,9 +218,19 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                     {formatCurrency(item.total_collected)}
                   </td>
 
-                  {/* Gap */}
+                  {/* Expenses */}
                   <td className="px-6 py-4 text-right font-black text-rose-600 bg-rose-50/10 border-l border-slate-100">
-                    {formatCurrency(item.total_revenue - item.total_collected)}
+                    {formatCurrency(item.total_expenses)}
+                  </td>
+
+                  {/* Expense GST */}
+                  <td className="px-6 py-4 text-right font-bold text-amber-600 bg-amber-50/10 border-l border-slate-100">
+                    {item.total_expense_gst > 0 ? formatCurrency(item.total_expense_gst) : '-'}
+                  </td>
+
+                  {/* Net Income (Revenue - Expenses) */}
+                  <td className="px-6 py-4 text-right font-black text-indigo-900 bg-indigo-100/50 border-l border-slate-100">
+                    {formatCurrency(item.total_revenue - item.total_expenses)}
                   </td>
                 </tr>
               ))}
@@ -249,7 +262,13 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                     {formatCurrency(grandTotals.total_collected)}
                   </td>
                   <td className="px-6 py-4 text-right font-black text-rose-400 border-l border-white/10">
-                    {formatCurrency(grandTotals.total_revenue - grandTotals.total_collected)}
+                    {formatCurrency(grandTotals.total_expenses)}
+                  </td>
+                  <td className="px-6 py-4 text-right font-bold text-amber-400 border-l border-white/10">
+                    {formatCurrency(grandTotals.total_expense_gst)}
+                  </td>
+                  <td className="px-6 py-4 text-right font-black text-white bg-white/10 border-l border-white/10">
+                    {formatCurrency(grandTotals.total_revenue - grandTotals.total_expenses)}
                   </td>
                 </tr>
               </tfoot>

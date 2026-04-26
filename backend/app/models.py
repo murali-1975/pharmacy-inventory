@@ -9,7 +9,7 @@ Defines the full relational schema, including:
   - Stock ledger (MedicineStock) and immutable audit trail (StockAdjustment)
   - Daily patient dispensing records
 """
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Boolean, UniqueConstraint, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Boolean, UniqueConstraint, JSON, Numeric
 from sqlalchemy.orm import relationship
 from .database import Base
 import datetime
@@ -425,6 +425,56 @@ class PatientPayment(Base):
     services = relationship("PatientPaymentService", back_populates="patient_payment", cascade="all, delete-orphan")
     payments = relationship("PatientPaymentValue", back_populates="patient_payment", cascade="all, delete-orphan")
 
+class ExpenseType(Base):
+    """Master list of expense categories."""
+    __tablename__ = "expense_types"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+class Expense(Base):
+    """Clinic/Pharmacy operational expenses."""
+    __tablename__ = "expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    expense_date = Column(Date, nullable=False)
+    expense_type_id = Column(Integer, ForeignKey("expense_types.id"), nullable=False)
+    details = Column(String, nullable=False)
+    reference_number = Column(String, nullable=True)
+    
+    amount = Column(Numeric(10, 2), nullable=False)
+    gst_amount = Column(Numeric(10, 2), default=0.0)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    notes = Column(String, nullable=True)
+    
+    # Audit Fields
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+    modified_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    modified_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+    
+    # Soft Delete
+    is_deleted = Column(Boolean, default=False, index=True)
+    deleted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+    expense_type = relationship("ExpenseType")
+    creator = relationship("User", foreign_keys=[created_by])
+    modifier = relationship("User", foreign_keys=[modified_by])
+    payments = relationship("ExpensePayment", back_populates="expense", cascade="all, delete-orphan")
+
+class ExpensePayment(Base):
+    """Individual payment entries for an expense (supports split payments)."""
+    __tablename__ = "expense_payments"
+    id = Column(Integer, primary_key=True, index=True)
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=False)
+    payment_mode_id = Column(Integer, ForeignKey("payment_mode.id"), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    notes = Column(String, nullable=True)
+    modified_date = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+
+    expense = relationship("Expense", back_populates="payments")
+    payment_mode = relationship("PaymentModeMaster")
+
 class PatientPaymentIdentifier(Base):
     """Junction mapping PatientPayment to PatientIdentifier."""
     __tablename__ = "ptnt_pymnt_x_ptnt_id"
@@ -471,7 +521,14 @@ class DailyFinanceSummary(Base):
     total_revenue = Column(Float, default=0.0)
     total_collected = Column(Float, default=0.0)
     total_gst = Column(Float, default=0.0)
+    
+    # Expense Aggregation
+    total_expenses = Column(Float, default=0.0)
+    total_expense_gst = Column(Float, default=0.0)
+    
     # JSON breakdowns for flexibility
     service_breakdown = Column(JSON, default=dict) # {service_name: total_amount}
     payment_breakdown = Column(JSON, default=dict) # {mode_name: total_value}
+    expense_breakdown = Column(JSON, default=dict) # {expense_type: total_amount}
+    
     last_updated = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))

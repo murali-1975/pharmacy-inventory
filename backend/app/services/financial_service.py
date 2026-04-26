@@ -28,7 +28,7 @@ def export_period_summary_excel(db: Session, summary: Dict[str, Any]) -> io.Byte
     # 1. Period Title Header
     ws.merge_cells('B1:C1')
     title_cell = ws['B1']
-    title_cell.value = f"Period {summary['start_date']} to {summary['end_date']}"
+    title_cell.value = f"Period {summary['start_date'].strftime('%d-%m-%Y')} to {summary['end_date'].strftime('%d-%m-%Y')}"
     
     # 2. Table Headers
     headers = ['S.No', 'Description', 'Amount (₹)']

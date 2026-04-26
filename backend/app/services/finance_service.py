@@ -4,7 +4,7 @@ import io
 import pandas as pd
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from app import models, schemas
 from app.core.logging_config import logger
 from app.utils import FinanceModuleError, ValidationError, ResourceNotFoundError
@@ -109,11 +109,12 @@ class FinanceService:
         required_cols = ["date", "patient name"]
         for rc in required_cols:
             if rc not in norm_cols:
+                logger.warning(f"Bulk Upload: Missing required column {rc}")
                 raise ValidationError(f"Missing required bulk column: {rc.title()}")
 
         success_count = 0
         errors = []
-        processed_dates = set()
+        processed_dates: Set[date] = set()
 
         for idx, row in df.iterrows():
             try:
@@ -340,6 +341,23 @@ class FinanceService:
                     p_mode = p_link.payment_mode.mode
                     p_map[p_mode] = p_map.get(p_mode, 0.0) + p_link.value
 
+            # --- EXPENSE AGGREGATION ---
+            expense_records = db.query(models.Expense).filter(
+                models.Expense.expense_date == summary_date,
+                models.Expense.is_deleted == False
+            ).all()
+
+            total_exp = 0.0
+            total_exp_gst = 0.0
+            e_map = {}
+
+            for exp in expense_records:
+                # Use total_amount as the debit value
+                total_exp += float(exp.total_amount)
+                total_exp_gst += float(exp.gst_amount or 0.0)
+                e_type = exp.expense_type.name
+                e_map[e_type] = e_map.get(e_type, 0.0) + float(exp.total_amount)
+
             db_summary = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.summary_date == summary_date).first()
             if not db_summary:
                 db_summary = models.DailyFinanceSummary(summary_date=summary_date)
@@ -349,16 +367,23 @@ class FinanceService:
             db_summary.total_revenue = revenue
             db_summary.total_collected = collected
             db_summary.total_gst = gst_liability
+            
+            # Update Expense Fields
+            db_summary.total_expenses = total_exp
+            db_summary.total_expense_gst = total_exp_gst
+            db_summary.expense_breakdown = e_map
+
             db_summary.service_breakdown = s_map
             db_summary.payment_breakdown = p_map
             db_summary.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
-            db.commit()
+            # Ensure changes are flushed but commit is left to the caller/transaction manager
+            db.flush()
+            logger.info(f"Summary: Successfully updated {summary_date}. Total Revenue: ₹{revenue}, Total Expenses: ₹{total_exp}")
             return db_summary
 
         except Exception as e:
-            db.rollback()
-            logger.error(f"Summary: Failed to update {summary_date}: {str(e)}")
+            logger.error(f"Summary: Failed to update {summary_date}: {str(e)}", exc_info=True)
             raise FinanceModuleError(f"Failed to recalculate daily summary: {str(e)}")
 
     @staticmethod
@@ -390,3 +415,61 @@ class FinanceService:
             db.rollback()
             logger.error(f"Finance: Failed to soft-delete payment {payment_id}: {str(e)}")
             raise FinanceModuleError(f"Failed to soft-delete payment: {str(e)}")
+    @staticmethod
+    def export_ledger_excel(ledger_data: schemas.LedgerReportSchema) -> io.BytesIO:
+        """
+        Exports the financial ledger to a professionally formatted Excel file.
+        """
+        output = io.BytesIO()
+        
+        # Prepare data for DataFrame
+        rows = []
+        # Add Opening Balance row
+        rows.append({
+            "Date": ledger_data.start_date,
+            "Details": "Opening Balance (B/F)",
+            "Credit": 0.0,
+            "Debit": 0.0,
+            "Credit GST": 0.0,
+            "Debit GST": 0.0,
+            "Balance": ledger_data.opening_balance
+        })
+        
+        for entry in ledger_data.entries:
+            rows.append({
+                "Date": entry.date,
+                "Details": entry.details,
+                "Credit": entry.credit,
+                "Debit": entry.debit,
+                "Credit GST": entry.credit_gst,
+                "Debit GST": entry.debit_gst,
+                "Balance": entry.balance
+            })
+            
+        df = pd.DataFrame(rows)
+        # Ensure Date is recognized as datetime for Excel formatting
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        with pd.ExcelWriter(output, engine='xlsxwriter', date_format='dd-mm-yyyy', datetime_format='dd-mm-yyyy') as writer:
+            df.to_excel(writer, sheet_name='Financial Ledger', index=False)
+            workbook = writer.book
+            worksheet = writer.sheets['Financial Ledger']
+            
+            # Formatting
+            header_format = workbook.add_format({
+                'bold': True, 'bg_color': '#1E293B', 'font_color': 'white', 'border': 1
+            })
+            currency_format = workbook.add_format({'num_format': '₹#,##0.00'})
+            date_format = workbook.add_format({'num_format': 'dd-mm-yyyy'})
+            
+            # Write headers
+            for col_num, value in enumerate(df.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+            
+            # Column widths
+            worksheet.set_column('A:A', 12, date_format)
+            worksheet.set_column('B:B', 30)
+            worksheet.set_column('C:G', 15, currency_format)
+            
+        output.seek(0)
+        return output

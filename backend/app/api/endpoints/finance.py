@@ -11,7 +11,7 @@ from typing import List, Optional
 import logging
 
 from app.database import get_db
-from app.auth import get_current_user, RoleChecker
+from app.auth import get_current_user, RoleChecker, admin_required
 from app import models, schemas, utils
 from app.services.finance_service import FinanceService
 from app.utils import ResourceNotFoundError
@@ -19,8 +19,6 @@ from app.utils import ResourceNotFoundError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/finance", tags=["Finance Management"])
-
-admin_required = RoleChecker(["Admin"])
 
 # =============================================================================
 # Master Data Endpoints
@@ -116,6 +114,36 @@ def update_payment_mode(
         db.refresh(db_obj)
         return db_obj
 
+@router.post("/masters/expense_types", response_model=schemas.ExpenseTypeSchema)
+def create_expense_type(
+    exp_in: schemas.ExpenseTypeCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(admin_required),
+):
+    with utils.db_error_handler("creating expense type", db):
+        db_obj = models.ExpenseType(**exp_in.model_dump())
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+@router.put("/masters/expense_types/{id}", response_model=schemas.ExpenseTypeSchema)
+def update_expense_type(
+    id: int,
+    exp_in: schemas.ExpenseTypeUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(admin_required),
+):
+    with utils.db_error_handler("updating expense type", db):
+        db_obj = db.query(models.ExpenseType).filter(models.ExpenseType.id == id).first()
+        if not db_obj:
+            raise ResourceNotFoundError("Expense type", id)
+        for key, value in exp_in.model_dump().items():
+            setattr(db_obj, key, value)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
 @router.patch("/masters/{entity}/{id}/toggle", response_model=None)
 def toggle_master_data(
     entity: str,
@@ -128,6 +156,7 @@ def toggle_master_data(
         if entity == "patient_identifiers": model = models.PatientIdentifier
         elif entity == "patient_services": model = models.PatientService
         elif entity == "payment_modes": model = models.PaymentModeMaster
+        elif entity == "expense_types": model = models.ExpenseType
         else: raise HTTPException(status_code=400, detail="Invalid entity")
 
         db_obj = db.query(model).filter(model.id == id).first()
@@ -147,16 +176,19 @@ def get_finance_masters(
     query_ids = db.query(models.PatientIdentifier)
     query_srvs = db.query(models.PatientService)
     query_modes = db.query(models.PaymentModeMaster)
+    query_exps = db.query(models.ExpenseType)
 
     if not include_inactive:
         query_ids = query_ids.filter(models.PatientIdentifier.is_active == True)
         query_srvs = query_srvs.filter(models.PatientService.is_active == True)
         query_modes = query_modes.filter(models.PaymentModeMaster.is_active == True)
+        query_exps = query_exps.filter(models.ExpenseType.is_active == True)
 
     return {
         "identifiers": query_ids.all(),
         "services": query_srvs.all(),
         "payment_modes": query_modes.all(),
+        "expense_types": query_exps.all(),
     }
 
 # =============================================================================

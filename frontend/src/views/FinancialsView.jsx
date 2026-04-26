@@ -89,11 +89,15 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
       a.download = `Portfolio_Summary_${dateRange.start}_${dateRange.end}.xlsx`;
       document.body.appendChild(a);
       a.click();
-      a.remove();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (err) {
       setError("Failed to export Excel: " + err.message);
     } finally {
@@ -170,8 +174,8 @@ const FinancialsView = ({ token, onUnauthorized = () => {} }) => {
     );
   }
 
-  const totalMonthlyRevenue = profit.reduce((sum, item) => sum + item.revenue, 0);
-  const totalMonthlyProfit = profit.reduce((sum, item) => sum + item.gross_profit, 0);
+  const totalMonthlyRevenue = (profit || []).reduce((sum, item) => sum + (item.revenue || 0), 0);
+  const totalMonthlyProfit = (profit || []).reduce((sum, item) => sum + (item.gross_profit || 0), 0);
 
   return (
     <div className="space-y-8 pb-10">

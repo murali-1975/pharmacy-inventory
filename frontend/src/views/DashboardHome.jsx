@@ -101,11 +101,15 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
+        link.style.display = 'none';
         link.setAttribute("href", url);
         link.setAttribute("download", `Low_Stock_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        }, 100);
       }
     } catch (error) {
       console.error("CSV Export failed:", error);
@@ -230,8 +234,8 @@ const DashboardHome = ({ setView, invoices = [], token, onUnauthorized = () => {
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
-          ) : lowStockItems.length > 0 ? (
-            lowStockItems.map((item) => (
+          ) : (lowStockItems || []).length > 0 ? (
+            (lowStockItems || []).map((item) => (
               <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">

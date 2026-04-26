@@ -41,6 +41,11 @@ class Settings(BaseSettings):
                 "Add it to your .env file or set it in your shell before starting the server."
             )
 
+    def is_feature_enabled(self, feature_name: str) -> bool:
+        """Checks if a specific feature flag is active."""
+        flags = [f.strip() for f in self.FEATURE_FLAGS.split(",") if f.strip()]
+        return feature_name in flags
+
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env")
         extra = "ignore"

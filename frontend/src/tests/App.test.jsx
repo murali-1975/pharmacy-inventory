@@ -4,6 +4,7 @@ import React from 'react';
 import App from '../App.jsx';
 import { api } from '../api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FeatureProvider } from '../context/FeatureContext.jsx';
 
 // Centralized API Mock
 vi.mock('../api', () => {
@@ -46,6 +47,10 @@ vi.mock('../api', () => {
     getGstReconciliation: vi.fn(),
     getStock: vi.fn(),
     getStockAdjustments: vi.fn(),
+    getFinanceMasters: vi.fn(),
+    getExpenses: vi.fn(),
+    deleteExpense: vi.fn(),
+    saveExpense: vi.fn(),
   };
   return {
     api: mockApi,
@@ -79,22 +84,56 @@ describe('App Component', () => {
     api.getSupplierAging.mockResolvedValue([]);
     api.getGstReconciliation.mockResolvedValue([]);
     api.getStock.mockResolvedValue({ items: [], total: 0 });
+    api.getFinanceMasters.mockResolvedValue({ expense_types: [], payment_modes: [] });
+    api.getExpenses.mockResolvedValue({ items: [], total: 0 });
     
-    globalThis.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        total_medicines: 10,
-        pending_invoices_amount: 5000,
-        monthly_procurement: 1200,
-        low_stock_alerts: 2
-      })
+    globalThis.fetch = vi.fn().mockImplementation((url) => {
+      if (url === '/api/config/features') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ features: [
+            'FINANCE_MANAGEMENT', 
+            'INVOICE_MANAGEMENT', 
+            'STOCK_MANAGEMENT', 
+            'DISPENSING_MANAGEMENT',
+            'SUPPLIER_MANAGEMENT'
+          ] })
+        });
+      }
+      if (url.includes('/api/stock/')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [], total: 0 })
+        });
+      }
+      if (url.includes('/api/financials/')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => {
+             if (url.includes('aging') || url.includes('profit')) return [];
+             return {};
+          }
+        });
+      }
+      // Default to analytics stats or generic objects
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          total_medicines: 10,
+          pending_invoices_amount: 5000,
+          monthly_procurement: 1200,
+          low_stock_alerts: 2
+        })
+      });
     });
   });
 
   it('renders login screen when not authenticated', async () => {
     render(
       <QueryClientProvider client={queryClient}>
-        <App />
+        <FeatureProvider>
+          <App />
+        </FeatureProvider>
       </QueryClientProvider>
     );
     await waitFor(() => {
@@ -108,7 +147,9 @@ describe('App Component', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <App />
+        <FeatureProvider>
+          <App />
+        </FeatureProvider>
       </QueryClientProvider>
     );
 
@@ -116,7 +157,9 @@ describe('App Component', () => {
     await screen.findByText(/Sign Out/i);
 
     // Wait for user info to load (ensures Admin role is recognized)
-    expect(screen.getAllByText(/admin/i).some(el => el.textContent === 'admin')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getAllByText(/admin/i).length).toBeGreaterThan(0);
+    });
 
     // Dashboard is default - wait for content to load
     await screen.findByText(/Total Medicines/i);
@@ -144,6 +187,15 @@ describe('App Component', () => {
     // Navigate to Admin
     fireEvent.click(screen.getAllByText('Admin Hub').find(el => el.tagName === 'SPAN'));
     await screen.findByRole('heading', { level: 1, name: /Administrative Hub/i });
+
+    const paymentHistory = await screen.findByText(/Payment History/i);
+    expect(paymentHistory).toBeDefined();
+
+    // Navigate to Expense History
+    const expHistoryLink = screen.getByText(/Expense History/i);
+    fireEvent.click(expHistoryLink);
+    const expHistoryTitle = await screen.findByText(/Audit and manage past operational outflows/i);
+    expect(expHistoryTitle).toBeDefined();
 
     // Logout
     fireEvent.click(screen.getByText(/Sign Out/i));

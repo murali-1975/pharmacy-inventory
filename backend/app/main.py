@@ -18,7 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import List
 from . import models, database, schemas
 from .routers import auth, suppliers, lookups, users, invoices, medicines, manufacturers, stock, dispensing, analytics, financials
-from .api.endpoints import finance
+from .api.endpoints import finance, expenses
 from .core.config import settings
 from .core.logging_config import LoggingMiddleware, logger
 from . import seed
@@ -105,6 +105,7 @@ app.include_router(financials.router)
 # Conditionally include staging/feature-flagged routers
 if "FINANCE_MANAGEMENT" in [f.strip() for f in settings.FEATURE_FLAGS.split(",") if f.strip()]:
     app.include_router(finance.router)
+    app.include_router(expenses.router)
 
 @app.get("/")
 def read_root():

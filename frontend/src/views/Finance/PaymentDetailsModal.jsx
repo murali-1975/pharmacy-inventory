@@ -8,8 +8,10 @@ import {
   FileText, 
   Activity,
   CheckCircle,
-  Tag
+  Tag,
+  MessageSquare
 } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 
 const PaymentDetailsModal = ({ payment, masters, onClose }) => {
   if (!payment) return null;
@@ -67,7 +69,7 @@ const PaymentDetailsModal = ({ payment, masters, onClose }) => {
                 <Calendar className="w-4 h-4" />
                 <span className="text-xs font-black uppercase tracking-widest">Payment Date</span>
               </div>
-              <p className="text-lg font-bold text-slate-800">{new Date(payment.payment_date).toLocaleDateString()}</p>
+              <p className="text-lg font-bold text-slate-800">{formatDate(payment.payment_date)}</p>
             </div>
           </div>
 

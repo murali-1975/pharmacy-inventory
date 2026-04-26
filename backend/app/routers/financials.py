@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from app import models, schemas, database, auth, utils
-from app.services import financial_service
+from app.services import financial_service, ledger_service, finance_service
 from app.core.logging_config import logger
 
 router = APIRouter(
@@ -127,7 +127,7 @@ def export_period_summary(
             
             if format == "excel":
                 output = financial_service.export_period_summary_excel(db, summary)
-                filename = f"Portfolio_Summary_{start_date}_{end_date}.xlsx"
+                filename = f"Portfolio_Summary_{start_date.strftime('%d-%m-%Y')}_to_{end_date.strftime('%d-%m-%Y')}.xlsx"
                 return Response(
                     content=output.getvalue(),
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -143,3 +143,48 @@ def export_period_summary(
             logger.error(f"Export error: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to generate export file.")
 
+
+
+@router.get("/ledger", response_model=schemas.LedgerReportSchema)
+def get_ledger(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(admin_required)
+):
+    """Generates the aggregated financial ledger for a given period."""
+    with utils.db_error_handler("fetching financial ledger"):
+        try:
+            return ledger_service.LedgerService.get_ledger_data(db, from_date, to_date)
+        except Exception as e:
+            logger.error(f"Ledger error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to generate ledger.")
+
+@router.get("/ledger/export")
+def export_ledger(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    format: str = Query(..., pattern="^(excel|pdf)$"),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(admin_required)
+):
+    """Exports the ledger as Excel."""
+    with utils.db_error_handler(f"exporting ledger ({format})"):
+        try:
+            ledger_data = ledger_service.LedgerService.get_ledger_data(db, from_date, to_date)
+            
+            if format == "excel":
+                output = finance_service.FinanceService.export_ledger_excel(ledger_data)
+                filename = f"Financial_Ledger_{from_date.strftime('%d-%m-%Y')}_to_{to_date.strftime('%d-%m-%Y')}.xlsx"
+                return Response(
+                    content=output.getvalue(),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"}
+                )
+            else:
+                # PDF handled on frontend
+                raise HTTPException(status_code=400, detail="PDF export should be handled via frontend reporting service.")
+                
+        except Exception as e:
+            logger.error(f"Export error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to generate export file.")

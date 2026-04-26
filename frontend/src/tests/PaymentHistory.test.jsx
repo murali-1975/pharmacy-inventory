@@ -32,6 +32,9 @@ describe('PaymentHistoryTable Component', () => {
     expect(await screen.findByText(/John Doe/i)).toBeInTheDocument();
     expect(await screen.findByText(/UHID-123/i)).toBeInTheDocument();
     expect(await screen.findAllByText(/1,500/i)).toHaveLength(2); // Bill and Due (since payments are missing in mock)
+    
+    // Check formatted date
+    expect(await screen.findByText('01-10-2023')).toBeInTheDocument();
   });
 
   it('shows pagination controls', async () => {

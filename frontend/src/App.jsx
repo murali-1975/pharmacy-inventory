@@ -279,7 +279,7 @@ const App = () => {
                 token={token} 
                 currentUser={currentUser} 
                 onUnauthorized={logout}
-                subTab={activeTab.split('-')[1]}
+                subTab={activeTab.substring(activeTab.indexOf('-') + 1)}
                 setActiveTab={setActiveTab}
               />
             </Feature>

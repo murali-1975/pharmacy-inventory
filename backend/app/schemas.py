@@ -561,6 +561,21 @@ class PaymentModeMasterSchema(PaymentModeMasterBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+class ExpenseTypeBase(BaseModel):
+    name: str
+    is_active: bool = True
+
+class ExpenseTypeCreate(ExpenseTypeBase):
+    pass
+
+class ExpenseTypeUpdate(ExpenseTypeBase):
+    """Schema for updating an expense type."""
+    pass
+
+class ExpenseTypeSchema(ExpenseTypeBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class PatientPaymentValueBase(BaseModel):
     payment_mode_id: int
     value: float
@@ -631,6 +646,7 @@ class FinanceMastersSchema(BaseModel):
     identifiers: List[PatientIdentifierSchema]
     services: List[PatientServiceSchema]
     payment_modes: List[PaymentModeMasterSchema]
+    expense_types: List[ExpenseTypeSchema]
 
 class BulkPaymentResult(BaseModel):
     success_count: int
@@ -676,8 +692,11 @@ class DailyFinanceSummarySchema(BaseModel):
     total_revenue: float
     total_collected: float
     total_gst: float
+    total_expenses: float = 0.0
+    total_expense_gst: float = 0.0
     service_breakdown: Dict[str, float]
     payment_breakdown: Dict[str, float]
+    expense_breakdown: Dict[str, float] = {}
     last_updated: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -686,10 +705,85 @@ class GrandTotalSummary(BaseModel):
     total_revenue: float = 0.0
     total_collected: float = 0.0
     total_gst: float = 0.0
+    total_expenses: float = 0.0
+    total_expense_gst: float = 0.0
     service_breakdown: Dict[str, float] = {}
     payment_breakdown: Dict[str, float] = {}
+    expense_breakdown: Dict[str, float] = {}
 
 class PaginatedDailySummary(BaseModel):
     total: int
     items: List[DailyFinanceSummarySchema]
     grand_total: Optional[GrandTotalSummary] = None
+
+# =============================================================================
+# Expense Recording Schemas
+# =============================================================================
+
+class ExpensePaymentBase(BaseModel):
+    payment_mode_id: int
+    amount: float
+    notes: Optional[str] = None
+
+class ExpensePaymentCreate(ExpensePaymentBase):
+    pass
+
+class ExpensePaymentSchema(ExpensePaymentBase):
+    id: int
+    payment_mode: Optional[PaymentModeMasterSchema] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ExpenseBase(BaseModel):
+    expense_date: datetime.date
+    expense_type_id: int
+    details: str
+    reference_number: Optional[str] = None
+    amount: float
+    gst_amount: float = 0.0
+    total_amount: float
+    notes: Optional[str] = None
+
+class ExpenseCreate(ExpenseBase):
+    payments: List[ExpensePaymentCreate] = []
+
+class ExpenseSchema(ExpenseBase):
+    id: int
+    created_by: int
+    created_date: datetime.datetime
+    modified_by: int
+    modified_date: datetime.datetime
+    expense_type: Optional[ExpenseTypeSchema] = None
+    payments: List[ExpensePaymentSchema] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class PaginatedExpense(BaseModel):
+    total: int
+    items: List[ExpenseSchema]
+
+class BulkExpenseResult(BaseModel):
+    """Summary of a bulk expense upload operation."""
+    success_count: int
+    error_count: int
+    error_csv_content: Optional[str] = None
+
+# =============================================================================
+# Financial Ledger Schemas
+# =============================================================================
+
+class LedgerEntrySchema(BaseModel):
+    """Represents a single row in the financial ledger."""
+    date: datetime.date
+    details: str
+    credit: float = 0.0
+    debit: float = 0.0
+    credit_gst: float = 0.0
+    debit_gst: float = 0.0
+    balance: float = 0.0
+
+class LedgerReportSchema(BaseModel):
+    """Consolidated ledger report with opening balance and entries."""
+    opening_balance: float
+    closing_balance: float
+    entries: List[LedgerEntrySchema]
+    start_date: datetime.date
+    end_date: datetime.date

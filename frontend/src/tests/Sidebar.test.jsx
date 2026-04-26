@@ -42,10 +42,26 @@ describe('Sidebar Component', () => {
     expect(defaultProps.setActiveTab).toHaveBeenCalledWith('stock');
   });
 
+  it('toggles collapsible sections', () => {
+    render(<Sidebar {...defaultProps} />);
+    
+    // Inventory is expanded by default in Sidebar.jsx
+    expect(screen.getByText('Suppliers')).toBeInTheDocument();
+    
+    // Collapse Inventory
+    fireEvent.click(screen.getByText('Inventory'));
+    expect(screen.queryByText('Suppliers')).not.toBeInTheDocument();
+    
+    // Expand Inventory
+    fireEvent.click(screen.getByText('Inventory'));
+    expect(screen.getByText('Suppliers')).toBeInTheDocument();
+  });
+
   it('shows administration section for Admin role', () => {
     render(<Sidebar {...defaultProps} />);
     expect(screen.getByText('Administration')).toBeInTheDocument();
     
+    // Financial Reports is inside Administration
     fireEvent.click(screen.getByText('Financial Reports'));
     expect(defaultProps.setActiveTab).toHaveBeenCalledWith('financials');
 

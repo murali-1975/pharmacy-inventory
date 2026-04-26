@@ -13,6 +13,8 @@ import pandas as pd
 from app import models, schemas, database, auth, utils
 from app.core.logging_config import logger
 from app.services.invoice_service import InvoiceService
+from app.services.expense_service import ExpenseService
+from app.core.config import settings
 
 router = APIRouter(
     prefix="/invoices",
@@ -325,6 +327,22 @@ def record_payment(
         if total_paid >= db_invoice.total_value:
             db_invoice.status = models.InvoiceStatus.Paid
             
+        # --- Auto Expense Integration (Feature Flag Guarded) ---
+        if settings.is_feature_enabled("FINANCE_MANAGEMENT"):
+            logger.info(f"Feature: FINANCE_MANAGEMENT active. Recording auto-expense for Invoice {invoice_id}")
+            try:
+                ExpenseService.record_expense_from_invoice_payment(
+                    db=db,
+                    invoice=db_invoice,
+                    payment=db_payment,
+                    user_id=current_user.id
+                )
+            except Exception as e:
+                logger.error(f"Auto-Expense: Failed for Invoice {invoice_id}: {str(e)}")
+                # We do NOT fail the invoice payment if expense recording fails, 
+                # but we log it for audit. In production, we might want this atomic.
+                # User asked to not break existing features, so soft-fail is safer.
+
         db.commit()
         db.refresh(db_payment)
         logger.info(f"User {current_user.username} recorded payment of {db_payment.paid_amount} for invoice ID {invoice_id}")

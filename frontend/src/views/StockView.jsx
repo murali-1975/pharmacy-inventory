@@ -405,16 +405,17 @@ export default function StockView({ medicinesList = [], onRefreshMedicines = () 
       if (link.download !== undefined) {
         link.href = url;
         link.setAttribute('download', fileName);
-        link.style.visibility = 'hidden';
+        link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        }, 100);
       } else {
         // Fallback for very specific browser configurations
         doc.save(fileName);
       }
-      
-      URL.revokeObjectURL(url);
 
       setSuccess("Full Price List exported as PDF successfully!");
     } catch (e) {

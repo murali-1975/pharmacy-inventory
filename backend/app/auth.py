@@ -108,3 +108,6 @@ class RoleChecker:
                 detail="You do not have enough privileges to perform this operation"
             )
         return user
+
+admin_required = RoleChecker(["Admin"])
+manager_required = RoleChecker(["Admin", "Manager"])

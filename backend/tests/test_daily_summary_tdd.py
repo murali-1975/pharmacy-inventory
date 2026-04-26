@@ -87,3 +87,46 @@ def test_summary_update_on_deletion(db):
     summary_after = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.summary_date == date.today()).first()
     assert summary_after.total_revenue == 100.0
     assert summary_after.patient_count == 1
+
+def test_summary_expense_aggregation(db):
+    """
+    TDD: Verifies that expenses are correctly aggregated into the daily summary.
+    """
+    from app.services.expense_service import ExpenseService
+    
+    # 1. Setup Master Data
+    exp_type = models.ExpenseType(name="Utility", is_active=True)
+    mode = models.PaymentModeMaster(mode="Bank Transfer", is_active=True)
+    db.add_all([exp_type, mode])
+    db.commit()
+
+    # 2. Record an expense
+    expense_in = schemas.ExpenseCreate(
+        expense_date=date.today(),
+        expense_type_id=exp_type.id,
+        details="Electricity Bill",
+        amount=1000.0,
+        gst_amount=180.0,
+        total_amount=1180.0,
+        payments=[{"payment_mode_id": mode.id, "amount": 1180.0}]
+    )
+    
+    ExpenseService.record_expense(db, expense_in, user_id=1)
+    db.commit()
+
+    # 3. Verify Summary
+    summary = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.summary_date == date.today()).first()
+    assert summary is not None
+    assert summary.total_expenses == 1180.0
+    assert summary.total_expense_gst == 180.0
+    assert summary.expense_breakdown["Utility"] == 1180.0
+
+    # 4. Soft Delete Expense
+    ExpenseService.soft_delete_expense(db, 1, user_id=1) # ID should be 1
+    db.commit()
+
+    # 5. Verify Summary Refreshed
+    summary_after = db.query(models.DailyFinanceSummary).filter(models.DailyFinanceSummary.summary_date == date.today()).first()
+    assert summary_after.total_expenses == 0.0
+    assert summary_after.total_expense_gst == 0.0
+    assert summary_after.expense_breakdown == {}

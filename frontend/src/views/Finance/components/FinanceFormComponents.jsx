@@ -195,7 +195,7 @@ export const SettlementCard = ({
             checked={isFree}
             onChange={(e) => onToggleFree(e.target.checked)}
           />
-          <label htmlFor="free_flag_comp" className="text-xs font-black text-slate-300 uppercase tracking-wider cursor-pointer select-none">Free / Charity Visit</label>
+          <label htmlFor="free_flag_comp" className="text-xs font-black text-slate-300 uppercase tracking-wider cursor-pointer select-none">Free</label>
         </div>
 
         <div className="space-y-2 pt-4 border-t border-white/5">

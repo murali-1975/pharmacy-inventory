@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Tag, Trash2, Edit2, AlertCircle, 
   Check, X, Activity, CreditCard, Fingerprint,
-  ToggleLeft, ToggleRight, Loader2
+  ToggleLeft, ToggleRight, Loader2, Wallet
 } from 'lucide-react';
 import api from '../../api';
 
@@ -25,13 +25,13 @@ const MasterTable = ({
   const [error, setError] = useState('');
 
   const filteredItems = (items || []).filter(item => {
-    const name = item.id_name || item.service_name || item.mode || '';
+    const name = item.id_name || item.service_name || item.mode || item.name || '';
     return name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const handleEditStart = (item) => {
     setIsEditing(item.id);
-    setEditValue(item.id_name || item.service_name || item.mode || '');
+    setEditValue(item.id_name || item.service_name || item.mode || item.name || '');
     setError('');
   };
 
@@ -43,7 +43,7 @@ const MasterTable = ({
     
     // Duplicate check
     const isDuplicate = items.some(item => {
-      const name = item.id_name || item.service_name || item.mode || '';
+      const name = item.id_name || item.service_name || item.mode || item.name || '';
       return name.toLowerCase() === editValue.trim().toLowerCase() && item.id !== id;
     });
 
@@ -124,7 +124,7 @@ const MasterTable = ({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filteredItems.map(item => {
-              const name = item.id_name || item.service_name || item.mode || '';
+              const name = item.id_name || item.service_name || item.mode || item.name || '';
               return (
                 <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
                   <td className="px-6 py-4 font-mono text-xs text-gray-400">#{item.id}</td>
@@ -200,7 +200,7 @@ const MasterTable = ({
 
 const MasterDataManagement = ({ token, onUnauthorized }) => {
   const [activeTab, setActiveTab] = useState('identifiers');
-  const [masters, setMasters] = useState({ identifiers: [], services: [], payment_modes: [] });
+  const [masters, setMasters] = useState({ identifiers: [], services: [], payment_modes: [], expense_types: [] });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -230,13 +230,15 @@ const MasterDataManagement = ({ token, onUnauthorized }) => {
   const handleSave = async (data, id) => {
     setActionLoading(true);
     const entity = activeTab === 'identifiers' ? 'patient_identifiers' : 
-                   activeTab === 'services' ? 'patient_services' : 'payment_modes';
+                   activeTab === 'services' ? 'patient_services' : 
+                   activeTab === 'modes' ? 'payment_modes' : 'expense_types';
     
     // Map internal key names to expected API field names
     const payload = {};
     if (activeTab === 'identifiers') payload.id_name = data.name;
     else if (activeTab === 'services') payload.service_name = data.name;
-    else payload.mode = data.name;
+    else if (activeTab === 'modes') payload.mode = data.name;
+    else payload.name = data.name;
 
     try {
       await api.saveFinanceMaster(token, entity, { ...payload, is_active: true }, id);
@@ -253,7 +255,8 @@ const MasterDataManagement = ({ token, onUnauthorized }) => {
   const handleToggle = async (id) => {
     setActionLoading(true);
     const entity = activeTab === 'identifiers' ? 'patient_identifiers' : 
-                   activeTab === 'services' ? 'patient_services' : 'payment_modes';
+                   activeTab === 'services' ? 'patient_services' : 
+                   activeTab === 'modes' ? 'payment_modes' : 'expense_types';
     
     try {
       await api.toggleFinanceMaster(token, entity, id);
@@ -271,6 +274,7 @@ const MasterDataManagement = ({ token, onUnauthorized }) => {
     { id: 'identifiers', name: 'Patient Identifiers', icon: Fingerprint, count: masters.identifiers.length },
     { id: 'services', name: 'Patient Services', icon: Activity, count: masters.services.length },
     { id: 'modes', name: 'Payment Modes', icon: CreditCard, count: masters.payment_modes.length },
+    { id: 'expenses', name: 'Expense Types', icon: Wallet, count: (masters.expense_types || []).length },
   ];
 
   if (loading) {
@@ -360,6 +364,20 @@ const MasterDataManagement = ({ token, onUnauthorized }) => {
             placeholder="New mode name..."
             loading={actionLoading}
           />
+        )}
+        {activeTab === 'expenses' && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+            <MasterTable 
+              title="Expense Types"
+              description="Manage categories for clinic expenses (Rent, Utilities, etc.)"
+              items={masters.expense_types}
+              icon={Wallet}
+              onSave={handleSave}
+              onToggle={handleToggle}
+              placeholder="New expense type..."
+              loading={actionLoading}
+            />
+          </div>
         )}
       </div>
     </div>

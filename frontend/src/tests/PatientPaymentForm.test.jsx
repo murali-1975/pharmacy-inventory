@@ -156,7 +156,7 @@ describe('PatientPaymentForm Unified Single-Page Logic', () => {
     fireEvent.change(screen.getAllByPlaceholderText('0.00')[0], { target: { value: '400' } });
 
     // Check Free checkbox
-    const freeCheckbox = screen.getByLabelText(/Free \/ Charity Visit/i);
+    const freeCheckbox = screen.getByLabelText(/^Free$/i);
     fireEvent.click(freeCheckbox);
     
     fireEvent.click(screen.getByText(/Confirm & Save/i));

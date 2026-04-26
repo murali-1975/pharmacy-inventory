@@ -310,11 +310,15 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
+    a.style.display = 'none';
     a.href = url;
     a.download = "dispensing_upload_errors.csv";
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
   };
 
   // --- Header (shared across all rows) ---
@@ -710,11 +714,15 @@ export default function DispensingView({ medicines = [], onRefreshMedicines = ()
                    const blob = await fetch(`${API_BASE}/dispensing/template`, { headers: authHeaders(token) }).then(r => r.blob());
                    const url = window.URL.createObjectURL(blob);
                    const a = document.createElement('a');
+                   a.style.display = 'none';
                    a.href = url;
                    a.download = 'dispensing_template.csv';
                    document.body.appendChild(a);
                    a.click();
-                   window.URL.revokeObjectURL(url);
+                   setTimeout(() => {
+                     document.body.removeChild(a);
+                     window.URL.revokeObjectURL(url);
+                   }, 100);
                  } catch (e) {
                    setError("Failed to download template");
                  }

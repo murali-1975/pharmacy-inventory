@@ -40,11 +40,15 @@ const BulkUploadModal = ({ onClose, onRefresh, token }) => {
       const blob = await api.getInvoiceTemplate(token);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
       a.download = 'invoice_template.csv';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (err) {
       alert('Failed to download template');
     }
@@ -55,11 +59,15 @@ const BulkUploadModal = ({ onClose, onRefresh, token }) => {
     const blob = new Blob([result.error_csv_content], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = 'upload_errors.csv';
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
   };
 
   return (

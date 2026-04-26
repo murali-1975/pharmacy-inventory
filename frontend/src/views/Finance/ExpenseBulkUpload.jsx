@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 
-const FinanceBulkUpload = ({ token, onUnauthorized }) => {
+const ExpenseBulkUpload = ({ token, onUnauthorized }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState(null);
@@ -19,12 +19,12 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const blob = await api.getFinanceTemplate(token);
+      const blob = await api.getExpenseTemplate(token);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = 'finance_payment_template.csv';
+      a.download = 'expense_bulk_template.csv';
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -47,11 +47,7 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`/api/finance/payments/upload`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
+      const response = await api.uploadExpenses(token, formData);
 
       if (response.status === 401) { onUnauthorized(); return; }
       
@@ -81,7 +77,7 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
-    a.download = 'payment_upload_errors.csv';
+    a.download = 'expense_upload_errors.csv';
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -95,12 +91,12 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-50 pb-6">
           <div className="flex items-center gap-3 text-slate-800">
-            <Upload className="w-6 h-6 text-indigo-600" />
-            <h2 className="text-xl font-black tracking-tight">Bulk Payment Upload</h2>
+            <Upload className="w-6 h-6 text-amber-600" />
+            <h2 className="text-xl font-black tracking-tight">Bulk Expense Upload</h2>
           </div>
           <button 
             onClick={handleDownloadTemplate}
-            className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+            className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition-all"
           >
             <Download className="w-4 h-4" />
             Template
@@ -118,13 +114,13 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
           <div className="space-y-4">
             <div 
               className={`border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center transition-all ${
-                file ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-200 hover:border-slate-300'
+                file ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 hover:border-slate-300'
               }`}
               onDragOver={(e) => { e.preventDefault(); }}
               onDrop={(e) => { e.preventDefault(); setFile(e.dataTransfer.files[0]); }}
             >
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <FileText className={`w-8 h-8 ${file ? 'text-indigo-500' : 'text-slate-400'}`} />
+                <FileText className={`w-8 h-8 ${file ? 'text-amber-500' : 'text-slate-400'}`} />
               </div>
               <div className="text-center">
                 <p className="text-slate-900 font-bold">
@@ -151,7 +147,7 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
             <button 
               onClick={handleUpload}
               disabled={!file || isUploading}
-              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-amber-600 text-white rounded-xl font-black shadow-lg shadow-amber-100 hover:bg-amber-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isUploading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
               {isUploading ? 'Processing...' : 'Upload & Process'}
@@ -196,16 +192,17 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
         )}
       </div>
 
-      <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex gap-4">
-        <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-          <AlertCircle className="w-6 h-6 text-indigo-600" />
+      <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100 flex gap-4">
+        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+          <AlertCircle className="w-6 h-6 text-amber-600" />
         </div>
         <div className="space-y-1">
-          <h4 className="text-sm font-bold text-slate-800">How bulk upload works</h4>
+          <h4 className="text-sm font-bold text-slate-800">Expense Bulk Upload Guide</h4>
           <p className="text-xs text-slate-500 leading-relaxed">
-            The system groups rows by <strong>Date, Patient Name, and Token No</strong>. 
-            All services and payments for the same patient-visit combination should be in separate rows but with identical patient headers. 
-            Master data names must match exactly as configured in the system.
+            Upload your operational expenses using our template. 
+            <strong>Base Amount + GST Amount</strong> must exactly equal the <strong>Total Amount</strong>.
+            Columns for payment modes (Cash, GPay, etc.) should contain the amount paid via that specific mode.
+            The sum of all payment mode columns must match the <strong>Total Amount</strong> for each row.
           </p>
         </div>
       </div>
@@ -213,4 +210,4 @@ const FinanceBulkUpload = ({ token, onUnauthorized }) => {
   );
 };
 
-export default FinanceBulkUpload;
+export default ExpenseBulkUpload;

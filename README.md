@@ -98,6 +98,7 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 9. **Unified Error Handling** — Automated database error handlers with auto-rollback and structured HTTP error mapping.
 10. **Finance Management (Feature Toggled)** — Patient payment tracking including patient identifiers, multiple services rendered, and multi-mode payment breakdown. Supports **Admin-only Soft Delete** with automated audit trails and summary recalculation. Currently scoped behind the `FINANCE_MANAGEMENT` flag.
 11. **Daily Finance Reporting** — Automated daily aggregation of patient counts, revenue breakdowns (per service/payment mode), and precise GST liability tracking (calculated at 5% for Medicine/Pharmacy services).
+12. **Expenses Management (NEW)** — Comprehensive tracking of clinic/pharmacy operational costs. Includes master data management for expense categories (Rent, Utilities, Salary, etc.) with Admin-only access controls.
 
 ---
 
@@ -116,7 +117,7 @@ Create a `.env` file in the `backend/` directory based on `.env.example`:
 | Analytics      | `/analytics`       | GET `/stats` (Dashboard KPIs)                                              |
 | Lookups        | `/lookups`        | `/status`, `/supplier-types` full CRUD                                     |
 | Users          | `/users`          | GET, POST, PUT, DELETE; PUT `/me/password`                                 |
-| Finance        | `/finance`        | GET, POST for `/payments`; `/masters` (Identifiers, Services, Modes); GET `/reports/summary` |
+| Finance        | `/finance`        | GET, POST for `/payments`; `/masters` (Identifiers, Services, Modes, Expense Types); GET `/reports/summary` |
 
 ---
 

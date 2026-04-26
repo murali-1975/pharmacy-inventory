@@ -12,6 +12,7 @@ import {
   Calendar,
   RefreshCcw
 } from 'lucide-react';
+import { formatDate } from '../../utils/dateUtils';
 import api from '../../api';
 
 const PaymentHistoryTable = ({ token, currentUser, onEdit, onView, onAdd, onUnauthorized }) => {
@@ -201,7 +202,7 @@ const PaymentHistoryTable = ({ token, currentUser, onEdit, onView, onAdd, onUnau
                 payments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-6 whitespace-nowrap">
-                      <div className="text-sm font-bold text-slate-700">{new Date(payment.payment_date).toLocaleDateString()}</div>
+                    <div className="text-sm font-bold text-slate-700">{formatDate(payment.payment_date)}</div>
                       <div className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{new Date(payment.payment_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                     </td>
                     <td className="px-6 py-6 whitespace-nowrap">
