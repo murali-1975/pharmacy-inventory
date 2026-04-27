@@ -260,21 +260,9 @@ def update_patient_payment(
     current_user: models.User = Depends(get_current_user),
 ):
     with utils.db_error_handler("updating patient payment", db):
-        db_obj = db.query(models.PatientPayment).filter(
-            models.PatientPayment.id == id,
-            models.PatientPayment.is_deleted == False
-        ).first()
-        if not db_obj:
-            raise ResourceNotFoundError("Payment record", id)
-        
-        for key, value in payment_in.model_dump(exclude={"identifiers", "services"}).items():
-            setattr(db_obj, key, value)
-        
-        db_obj.modified_by = current_user.id
-        db_obj.modified_date = datetime.datetime.now(datetime.timezone.utc)
+        db_obj = FinanceService.update_payment(db, id, payment_in, current_user.id)
         db.commit()
         db.refresh(db_obj)
-        FinanceService.recalculate_daily_summary(db, db_obj.payment_date)
         return db_obj
 
 @router.delete("/payments/{id}", status_code=status.HTTP_204_NO_CONTENT)

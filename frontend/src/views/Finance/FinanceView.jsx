@@ -47,6 +47,7 @@ const FinanceView = ({ token, currentUser, onUnauthorized, subTab, setActiveTab 
     const commonProps = {
       token,
       currentUser,
+      masters,
       onEdit: (payment) => { setEditingPayment(payment); setActiveTab('finance-record'); },
       onView: (payment) => { setViewingPayment(payment); },
       onAdd: () => { setEditingPayment(null); setActiveTab('finance-record'); },
@@ -55,10 +56,10 @@ const FinanceView = ({ token, currentUser, onUnauthorized, subTab, setActiveTab 
 
     switch (subTab) {
       case 'dashboard':
-        if (currentUser?.role !== 'Admin') return <PaymentHistoryTable {...commonProps} />;
+        if (currentUser?.role !== 'Admin' && currentUser?.role !== 'Staff') return <PaymentHistoryTable {...commonProps} />;
         return <FinanceDashboard token={token} onUnauthorized={onUnauthorized} />;
       case 'summary':
-        if (currentUser?.role !== 'Admin') return <PaymentHistoryTable {...commonProps} />;
+        if (currentUser?.role !== 'Admin' && currentUser?.role !== 'Staff') return <PaymentHistoryTable {...commonProps} />;
         return <DailySummaryReport token={token} onUnauthorized={onUnauthorized} />;
       case 'history':
         return <PaymentHistoryTable {...commonProps} />;

@@ -86,6 +86,80 @@ class FinanceService:
         return db_payment
 
     @staticmethod
+    def update_payment(
+        db: Session,
+        payment_id: int,
+        payment_in: schemas.PatientPaymentUpdate,
+        user_id: int
+    ) -> models.PatientPayment:
+        """
+        Updates an existing patient payment and its nested relationships.
+        Recalculates status and daily summaries.
+        """
+        logger.info(f"Finance: Updating payment record {payment_id}")
+        db_obj = db.query(models.PatientPayment).filter(
+            models.PatientPayment.id == payment_id,
+            models.PatientPayment.is_deleted == False
+        ).first()
+        if not db_obj:
+             raise ResourceNotFoundError("Payment record", payment_id)
+
+        # 1. Update basic fields manually to avoid overwriting relationships or audit fields unintentionally
+        db_obj.patient_name = payment_in.patient_name.strip()
+        db_obj.payment_date = payment_in.payment_date
+        db_obj.total_amount = payment_in.total_amount
+        db_obj.gst_amount = payment_in.gst_amount
+        db_obj.notes = payment_in.notes.strip() if payment_in.notes else None
+        db_obj.free_flag = payment_in.free_flag
+        db_obj.token_no = payment_in.token_no
+        db_obj.modified_by = user_id
+        db_obj.modified_date = datetime.datetime.now(datetime.timezone.utc)
+
+        # 2. Force-rebuild nested relationships
+        # We clear the lists and flush to ensure old records are deleted by 'delete-orphan'
+        db_obj.identifiers = []
+        db_obj.services = []
+        db_obj.payments = []
+        db.flush()
+
+        # Re-add Identifiers
+        for ident_in in payment_in.identifiers:
+            db_obj.identifiers.append(models.PatientPaymentIdentifier(
+                identifier_id=ident_in.identifier_id,
+                id_value=ident_in.id_value.strip(),
+            ))
+
+        # Re-add Services
+        for srv_in in payment_in.services:
+            db_obj.services.append(models.PatientPaymentService(
+                service_id=srv_in.service_id,
+                amount=srv_in.amount
+            ))
+
+        # Re-add Payments
+        total_paid_calc = 0.0
+        for pay_val_in in payment_in.payments:
+            total_paid_calc += pay_val_in.value
+            db_obj.payments.append(models.PatientPaymentValue(
+                payment_mode_id=pay_val_in.payment_mode_id,
+                value=pay_val_in.value,
+                notes=pay_val_in.notes.strip() if pay_val_in.notes else None,
+                modified_by=user_id,
+            ))
+
+        # 3. Recalculate Status based on ACTUAL data being saved
+        db_obj.payment_status = FinanceService._determine_payment_status(
+            db_obj.total_amount, 
+            total_paid_calc, 
+            db_obj.free_flag
+        )
+
+        db.flush()
+        FinanceService.recalculate_daily_summary(db, db_obj.payment_date)
+        
+        return db_obj
+
+    @staticmethod
     def _determine_payment_status(total_bill: float, total_paid: float, is_free: bool) -> str:
         if is_free:
             return "PAID"
@@ -234,7 +308,11 @@ class FinanceService:
         
         def get_day_total(d: date):
             return db.query(func.sum(models.PatientPayment.total_amount))\
-                .filter(models.PatientPayment.payment_date == d, models.PatientPayment.is_deleted == False).scalar() or 0.0
+                .filter(
+                    models.PatientPayment.payment_date == d, 
+                    models.PatientPayment.is_deleted == False,
+                    models.PatientPayment.free_flag == False
+                ).scalar() or 0.0
 
         def get_day_count(d: date):
             return db.query(models.PatientPayment)\
@@ -247,7 +325,11 @@ class FinanceService:
 
         # Month-to-Date
         total_month = db.query(func.sum(models.PatientPayment.total_amount))\
-            .filter(models.PatientPayment.payment_date >= first_of_month, models.PatientPayment.is_deleted == False).scalar() or 0.0
+            .filter(
+                models.PatientPayment.payment_date >= first_of_month, 
+                models.PatientPayment.is_deleted == False,
+                models.PatientPayment.free_flag == False
+            ).scalar() or 0.0
             
         # Prev Month MTD
         last_month_start = (first_of_month - datetime.timedelta(days=1)).replace(day=1)
@@ -258,7 +340,8 @@ class FinanceService:
             .filter(
                 models.PatientPayment.payment_date >= last_month_start,
                 models.PatientPayment.payment_date <= comp_prev_month_end,
-                models.PatientPayment.is_deleted == False
+                models.PatientPayment.is_deleted == False,
+                models.PatientPayment.free_flag == False
             ).scalar() or 0.0
 
         return {
@@ -279,7 +362,12 @@ class FinanceService:
             func.sum(models.PatientPaymentService.amount).label("total"),
             func.count(models.PatientPaymentService.id).label("count")
         ).join(models.PatientPaymentService).join(models.PatientPayment)\
-         .filter(models.PatientPayment.payment_date >= start, models.PatientPayment.payment_date <= end, models.PatientPayment.is_deleted == False)\
+         .filter(
+             models.PatientPayment.payment_date >= start, 
+             models.PatientPayment.payment_date <= end, 
+             models.PatientPayment.is_deleted == False,
+             models.PatientPayment.free_flag == False
+         )\
          .group_by(models.PatientService.service_name).all()
         
         return [{"service_name": n, "total_amount": float(t), "count": c} for n, t, c in data]
@@ -303,7 +391,12 @@ class FinanceService:
         data = db.query(
             models.PatientPayment.payment_date,
             func.sum(models.PatientPayment.total_amount).label("total")
-        ).filter(models.PatientPayment.payment_date >= trend_start, models.PatientPayment.payment_date <= end, models.PatientPayment.is_deleted == False)\
+        ).filter(
+            models.PatientPayment.payment_date >= trend_start, 
+            models.PatientPayment.payment_date <= end, 
+            models.PatientPayment.is_deleted == False,
+            models.PatientPayment.free_flag == False
+        )\
          .group_by(models.PatientPayment.payment_date).order_by(models.PatientPayment.payment_date).all()
         
         return [{"date": d.strftime("%Y-%m-%d"), "amount": float(t)} for d, t in data]
@@ -322,19 +415,28 @@ class FinanceService:
             ).all()
             
             p_count = len(records)
-            revenue = sum(r.total_amount for r in records)
+            revenue = sum(r.total_amount for r in records if not r.free_flag)
             collected = 0.0
             gst_liability = 0.0
             s_map = {}
             p_map = {}
 
             for r in records:
-                for s_link in r.services:
-                    s_name = s_link.service.service_name
-                    s_amt = s_link.amount
-                    s_map[s_name] = s_map.get(s_name, 0.0) + s_amt
-                    if s_name.lower() in ["pharmacy", "medicine"]:
-                        gst_liability += (s_amt * 0.05)
+                # If free, services don't count towards revenue breakdown
+                if not r.free_flag:
+                    for s_link in r.services:
+                        s_name = s_link.service.service_name
+                        s_amt = s_link.amount
+                        s_map[s_name] = s_map.get(s_name, 0.0) + s_amt
+                        if s_name.lower() in ["pharmacy", "medicine"]:
+                            gst_liability += (s_amt * 0.05)
+                else:
+                    # For free patients, we still track that they received the service (value 0)
+                    # so that the breakdown is complete but doesn't add to revenue
+                    for s_link in r.services:
+                        s_name = s_link.service.service_name
+                        if s_name not in s_map:
+                            s_map[s_name] = 0.0
                 
                 for p_link in r.payments:
                     collected += p_link.value

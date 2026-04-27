@@ -628,7 +628,9 @@ class PatientPaymentCreate(PatientPaymentBase):
 
 class PatientPaymentUpdate(PatientPaymentBase):
     """Schema for updating a patient payment record."""
-    pass
+    identifiers: List[PatientPaymentIdentifierCreate] = []
+    services: List[PatientPaymentServiceCreate] = []
+    payments: List[PatientPaymentValueCreate] = []
 
 class PatientPaymentSchema(PatientPaymentBase):
     id: int

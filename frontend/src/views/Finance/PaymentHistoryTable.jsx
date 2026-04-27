@@ -10,12 +10,14 @@ import {
   Plus,
   AlertCircle,
   Calendar,
-  RefreshCcw
+  RefreshCcw,
+  FileText
 } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
+import { generateInvoicePDF } from '../../utils/invoiceGenerator';
 import api from '../../api';
 
-const PaymentHistoryTable = ({ token, currentUser, onEdit, onView, onAdd, onUnauthorized }) => {
+const PaymentHistoryTable = ({ token, currentUser, masters, onEdit, onView, onAdd, onUnauthorized }) => {
   const [payments, setPayments] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -203,7 +205,6 @@ const PaymentHistoryTable = ({ token, currentUser, onEdit, onView, onAdd, onUnau
                   <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-6 whitespace-nowrap">
                     <div className="text-sm font-bold text-slate-700">{formatDate(payment.payment_date)}</div>
-                      <div className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{new Date(payment.payment_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                     </td>
                     <td className="px-6 py-6 whitespace-nowrap">
                       <div className="font-black text-slate-900 tracking-tight">{payment.patient_name}</div>
@@ -255,7 +256,17 @@ const PaymentHistoryTable = ({ token, currentUser, onEdit, onView, onAdd, onUnau
                       })()}
                     </td>
                     <td className="px-6 py-6 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 translate-x-2">
+                      <div className="flex items-center justify-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-all transform md:group-hover:translate-x-0 md:translate-x-2">
+                        <button 
+                          onClick={() => {
+                            console.log("[PaymentHistoryTable] Invoice requested for:", payment.patient_name);
+                            generateInvoicePDF(payment, masters);
+                          }}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                          title="Generate Invoice"
+                        >
+                          <FileText className="w-5 h-5" />
+                        </button>
                         <button 
                           onClick={() => onView?.(payment)}
                           className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"

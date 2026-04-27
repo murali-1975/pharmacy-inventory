@@ -9,7 +9,9 @@ def test_financials_rbac_enforcement(staff_client):
         "/financials/valuation",
         "/financials/aging",
         "/financials/gst",
-        "/financials/profit"
+        "/financials/profit",
+        "/financials/ledger",
+        "/financials/period-summary"
     ]
     for ep in endpoints:
         response = staff_client.get(ep)

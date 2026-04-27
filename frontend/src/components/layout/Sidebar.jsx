@@ -134,8 +134,8 @@ const Sidebar = ({
 
             {sidebarOpen && financeExpanded && (
               <div className="mt-2 ml-4 space-y-1 border-l-2 border-gray-50 pl-2 animate-in slide-in-from-top-2 duration-300">
-                {/* Overview Group */}
-                {currentUser?.role === 'Admin' && (
+                {/* Overview Group - Visible to Admin and Staff */}
+                {(currentUser?.role === 'Admin' || currentUser?.role === 'Staff') && (
                   <>
                     <SidebarItem 
                       icon={TrendingUp} 
@@ -151,14 +151,18 @@ const Sidebar = ({
                       onClick={() => setActiveTab('finance-summary')} 
                       isOpen={sidebarOpen}
                     />
-                    <SidebarItem 
-                      icon={BookOpen} 
-                      label="Financial Ledger" 
-                      active={activeTab === 'finance-ledger'} 
-                      onClick={() => setActiveTab('finance-ledger')} 
-                      isOpen={sidebarOpen}
-                    />
                   </>
+                )}
+
+                {/* Sensitive Financial Data - Admin Only */}
+                {currentUser?.role === 'Admin' && (
+                  <SidebarItem 
+                    icon={BookOpen} 
+                    label="Financial Ledger" 
+                    active={activeTab === 'finance-ledger'} 
+                    onClick={() => setActiveTab('finance-ledger')} 
+                    isOpen={sidebarOpen}
+                  />
                 )}
 
                 {/* Payments Group */}
