@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
 import api from '../../api';
+import DailyBreakdownModal from './DailyBreakdownModal';
 
 const DailySummaryReport = ({ token, onUnauthorized }) => {
   const [summaries, setSummaries] = useState([]);
@@ -29,6 +30,7 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
     total: 0
   });
   const [grandTotals, setGrandTotals] = useState(null);
+  const [viewingSummary, setViewingSummary] = useState(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -119,6 +121,7 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
             <thead>
               <tr className="bg-slate-50/80 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
                 <th rowSpan="2" className="px-6 py-4 sticky left-0 bg-slate-50/80 z-10 border-r border-slate-100">Date</th>
+                <th rowSpan="2" className="px-4 py-4 text-center bg-indigo-50 text-indigo-700 border-r border-slate-100 font-black">Report</th>
                 <th rowSpan="2" className="px-4 py-4 text-center border-r border-slate-100">Patients</th>
                 <th colSpan={masters.services.length} className="px-4 py-2 text-center border-b border-slate-100 bg-indigo-50/30 text-indigo-600">
                   <div className="flex items-center justify-center gap-2">
@@ -175,6 +178,17 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                   <td className="px-6 py-4 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors border-r border-slate-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                     {formatDate(item.summary_date)}
                   </td>
+
+                  {/* Actions Link */}
+                  <td className="px-3 py-4 text-center border-r border-slate-100 bg-indigo-50/30">
+                    <button 
+                      onClick={() => setViewingSummary(item)}
+                      className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black rounded-lg hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-1.5 mx-auto active:scale-95"
+                    >
+                      <Search className="w-3 h-3" />
+                      VIEW
+                    </button>
+                  </td>
                   
                   {/* Patients */}
                   <td className="px-4 py-4 text-center border-r border-slate-100">
@@ -228,7 +242,6 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
                     {item.total_expense_gst > 0 ? formatCurrency(item.total_expense_gst) : '-'}
                   </td>
 
-                  {/* Net Income (Revenue - Expenses) */}
                   <td className="px-6 py-4 text-right font-black text-indigo-900 bg-indigo-100/50 border-l border-slate-100">
                     {formatCurrency(item.total_revenue - item.total_expenses)}
                   </td>
@@ -239,6 +252,7 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
               <tfoot className="bg-slate-900 text-white text-xs font-bold uppercase tracking-widest">
                 <tr>
                   <td className="px-6 py-4 sticky left-0 bg-slate-900 z-10 border-r border-white/10">Grand Total</td>
+                  <td className="px-4 py-4 border-r border-white/10 bg-white/5"></td>
                   <td className="px-4 py-4 text-center border-r border-white/10">
                     {grandTotals.patient_count}
                   </td>
@@ -338,6 +352,13 @@ const DailySummaryReport = ({ token, onUnauthorized }) => {
           Export to Excel
         </button>
       </div>
+
+      {viewingSummary && (
+        <DailyBreakdownModal 
+          summary={viewingSummary}
+          onClose={() => setViewingSummary(null)}
+        />
+      )}
     </div>
   );
 };

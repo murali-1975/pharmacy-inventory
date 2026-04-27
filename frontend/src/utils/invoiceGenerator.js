@@ -177,10 +177,183 @@ export const generateInvoicePDF = (payment, masters) => {
   doc.text("THANK YOU FOR YOUR VISIT", 105, 287, { align: 'center' });
   
   // Trigger Download
-  const filename = `Invoice_${payment.patient_name.replace(/\s+/g, '_')}_${formatDate(payment.payment_date)}.pdf`;
+  const safeName = (payment.patient_name || 'Patient').replace(/[^a-z0-9]/gi, '_');
+  const filename = `Invoice_${safeName}_${formatDate(payment.payment_date)}.pdf`;
   doc.save(filename);
   } catch (error) {
     console.error("Failed to generate PDF invoice:", error);
     alert("SYSTEM ERROR: Could not generate PDF. Please try again or contact support. Details: " + error.message);
+  }
+};
+
+/**
+ * Generates a detailed daily financial summary report.
+ * @param {Object} summary - The daily finance summary object.
+ */
+export const generateDailySummaryPDF = (summary) => {
+  console.info("[invoiceGenerator] Generating Daily Summary PDF for:", summary?.summary_date);
+  
+  if (!summary) {
+    console.error("[invoiceGenerator] No summary data provided.");
+    return;
+  }
+
+  try {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Ensure autoTable is loaded (Resilient Call)
+    const applyAutoTable = (pdfDoc, options) => {
+      if (typeof pdfDoc.autoTable === 'function') {
+        return pdfDoc.autoTable(options);
+      } else if (typeof autoTable === 'function') {
+        return autoTable(pdfDoc, options);
+      } else if (autoTable && typeof autoTable.default === 'function') {
+        return autoTable.default(pdfDoc, options);
+      }
+      throw new Error("jsPDF-AutoTable plugin not found");
+    };
+
+    const safeINR = (val) => {
+      // Strips the rupee symbol which renders poorly in jsPDF default fonts
+      return 'Rs. ' + new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 0
+      }).format(val || 0);
+    };
+
+    // --- Header ---
+    doc.setFontSize(20);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "bold");
+    doc.text(CLINIC_NAME, 105, 20, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.text("Daily Financial Performance Report", 105, 26, { align: 'center' });
+    
+    doc.setDrawColor(79, 70, 229);
+    doc.setLineWidth(0.5);
+    doc.line(20, 32, 190, 32);
+
+    // --- Summary Metadata ---
+    const displayDate = formatDate(summary.summary_date);
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "bold");
+    doc.text(`REPORT DATE: ${displayDate}`, 20, 42);
+    
+    // Summary KPI Box (Centered Alignment)
+    doc.setFillColor(248, 250, 252);
+    doc.rect(20, 48, 170, 25, 'F');
+    
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Total Patients", 41, 56, { align: 'center' });
+    doc.text("Total Revenue", 82, 56, { align: 'center' });
+    doc.text("Total Expenses", 123, 56, { align: 'center' });
+    doc.text("Net Income", 164, 56, { align: 'center' });
+
+    doc.setFontSize(13);
+    doc.setTextColor(30, 41, 59);
+    doc.text(summary.patient_count?.toString() || "0", 41, 64, { align: 'center' });
+    
+    doc.setTextColor(16, 185, 129); // Emerald
+    doc.text(safeINR(summary.total_revenue), 82, 64, { align: 'center' });
+    
+    doc.setTextColor(239, 68, 68); // Rose
+    doc.text(safeINR(summary.total_expenses), 123, 64, { align: 'center' });
+    
+    doc.setTextColor(79, 70, 229); // Indigo
+    doc.text(safeINR(summary.total_revenue - summary.total_expenses), 164, 64, { align: 'center' });
+
+    // --- Income Breakdown Table ---
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "bold");
+    doc.text("1. INCOME BREAKDOWN (By Service)", 20, 85);
+
+    const serviceRows = Object.entries(summary.service_breakdown).map(([name, val]) => [name, safeINR(val)]);
+    applyAutoTable(doc, {
+      startY: 90,
+      head: [['Service Name', 'Amount (INR)']],
+      body: serviceRows,
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+
+    // --- Payment Mode Summary ---
+    let currentY = doc.lastAutoTable.finalY + 15;
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("2. COLLECTION SUMMARY (By Mode)", 20, currentY);
+
+    const paymentRows = Object.entries(summary.payment_breakdown).map(([mode, val]) => [mode, safeINR(val)]);
+    applyAutoTable(doc, {
+      startY: currentY + 5,
+      head: [['Payment Mode', 'Collected Amount']],
+      body: paymentRows,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129], textColor: 255 },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+
+    // --- Expense Breakdown Table ---
+    currentY = doc.lastAutoTable.finalY + 15;
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("3. EXPENSE BREAKDOWN (By Category)", 20, currentY);
+
+    const expenseRows = Object.entries(summary.expense_breakdown || {}).map(([type, val]) => [type, safeINR(val)]);
+    if (expenseRows.length === 0) expenseRows.push(["No Expenses", "Rs. 0"]);
+    
+    applyAutoTable(doc, {
+      startY: currentY + 5,
+      head: [['Expense Category', 'Debit Amount']],
+      body: expenseRows,
+      theme: 'striped',
+      headStyles: { fillColor: [239, 68, 68], textColor: 255 },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'right' } },
+      foot: [['Total Daily Expenses', safeINR(summary.total_expenses)]],
+      footStyles: { fillColor: [254, 226, 226], textColor: [153, 27, 27], fontStyle: 'bold' }
+    });
+
+    // --- Tax Details ---
+    currentY = doc.lastAutoTable.finalY + 15;
+    if (currentY > 260) { doc.addPage(); currentY = 20; }
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tax Summary:", 20, currentY);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Output GST (Collected): ${safeINR(summary.total_gst)}`, 20, currentY + 6);
+    doc.text(`Input GST (Claimable): ${safeINR(summary.total_expense_gst)}`, 20, currentY + 11);
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Generated on ${new Date().toLocaleString()} | Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
+    }
+
+    const safeDate = displayDate.replace(/[^a-z0-9]/gi, '-');
+    doc.save(`Daily_Summary_${safeDate}.pdf`);
+  } catch (error) {
+    console.error("[invoiceGenerator] Summary PDF Error:", error);
+    alert("Failed to generate summary PDF. Details: " + error.message);
   }
 };

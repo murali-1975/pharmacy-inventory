@@ -1,14 +1,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import PaymentHistoryTable from '../PaymentHistoryTable';
-import api from '../../../api';
+import PaymentHistoryTable from '../../views/Finance/PaymentHistoryTable';
+import api from '../../api';
 
 // Mock the API and icons
-vi.mock('../../../api');
+vi.mock('../../api');
 vi.mock('lucide-react', () => ({
   History: () => <div>HistoryIcon</div>,
   Plus: () => <div>PlusIcon</div>,
   Search: () => <div>SearchIcon</div>,
+  Activity: () => <div>ActivityIcon</div>,
   Filter: () => <div>FilterIcon</div>,
   Eye: () => <div>EyeIcon</div>,
   AlertCircle: () => <div>AlertIcon</div>,
@@ -17,7 +18,8 @@ vi.mock('lucide-react', () => ({
   ChevronLeft: () => <div>LeftIcon</div>,
   ChevronRight: () => <div>RightIcon</div>,
   Calendar: () => <div>CalendarIcon</div>,
-  RefreshCcw: () => <div>RefreshIcon</div>
+  RefreshCcw: () => <div>RefreshIcon</div>,
+  FileText: () => <div>FileTextIcon</div>
 }));
 
 const mockPayments = {
@@ -62,7 +64,7 @@ describe('PaymentHistoryTable Soft Delete', () => {
 
     // Should show confirmation (mocking window.confirm or checking for modal text)
     // For this test, let's assume we use a confirmation text in UI
-    expect(screen.getByText(/Are you sure you want to delete/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confirm Deletion/i)).toBeInTheDocument();
 
     // Confirm deletion
     const confirmBtn = screen.getByText(/^Delete$/i);

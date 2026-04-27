@@ -339,17 +339,24 @@ def get_daily_summaries(
     # Restoring Grand Totals calculation
     grand_total = {
         "patient_count": 0, "total_revenue": 0.0, "total_collected": 0.0, "total_gst": 0.0,
-        "service_breakdown": {}, "payment_breakdown": {}
+        "total_expenses": 0.0, "total_expense_gst": 0.0,
+        "service_breakdown": {}, "payment_breakdown": {}, "expense_breakdown": {}
     }
     for s in all_summaries:
         grand_total["patient_count"] += s.patient_count
         grand_total["total_revenue"] += s.total_revenue
         grand_total["total_collected"] += s.total_collected
         grand_total["total_gst"] += s.total_gst
+        grand_total["total_expenses"] += s.total_expenses
+        grand_total["total_expense_gst"] += s.total_expense_gst
+        
         for name, amt in s.service_breakdown.items():
             grand_total["service_breakdown"][name] = grand_total["service_breakdown"].get(name, 0.0) + amt
         for mode, amt in s.payment_breakdown.items():
             grand_total["payment_breakdown"][mode] = grand_total["payment_breakdown"].get(mode, 0.0) + amt
+        if s.expense_breakdown:
+            for etype, amt in s.expense_breakdown.items():
+                grand_total["expense_breakdown"][etype] = grand_total["expense_breakdown"].get(etype, 0.0) + amt
 
     items = all_summaries[skip : skip + limit]
     return {"total": total, "items": items, "grand_total": grand_total}
