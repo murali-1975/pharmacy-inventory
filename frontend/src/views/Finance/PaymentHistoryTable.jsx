@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Calendar,
   RefreshCcw,
-  FileText
+  FileText,
+  Download
 } from 'lucide-react';
 import { formatDate } from '../../utils/dateUtils';
 import { generateInvoicePDF } from '../../utils/invoiceGenerator';
@@ -32,6 +33,7 @@ const PaymentHistoryTable = ({ token, currentUser, masters, onEdit, onView, onAd
   
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [loadingExport, setLoadingExport] = useState(false);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,26 @@ const PaymentHistoryTable = ({ token, currentUser, masters, onEdit, onView, onAd
     setToDate('');
   };
 
+  const handleExportExcel = async () => {
+    setLoadingExport(true);
+    try {
+      const blob = await api.exportPatientPayments(token, searchTerm, singleDate, fromDate, toDate);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Patient_Payments_${new Date().toLocaleDateString('en-GB').replace(/\//g, '_')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data to Excel. Please try again.');
+    } finally {
+      setLoadingExport(false);
+    }
+  };
+
   const clearDateFilters = () => {
     setSingleDate('');
     setFromDate('');
@@ -114,6 +136,19 @@ const PaymentHistoryTable = ({ token, currentUser, masters, onEdit, onView, onAd
             title="Clear Filters"
           >
             <RefreshCcw className="w-3 h-3" />
+          </button>
+
+          <button 
+            onClick={handleExportExcel}
+            disabled={loadingExport}
+            className="flex items-center gap-2 text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100 disabled:opacity-50"
+          >
+            {loadingExport ? (
+              <RefreshCcw className="w-3 h-3 animate-spin" />
+            ) : (
+              <Download className="w-3 h-3" />
+            )}
+            {loadingExport ? 'Exporting...' : 'Export Excel'}
           </button>
 
           <button 

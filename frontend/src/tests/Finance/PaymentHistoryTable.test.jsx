@@ -19,7 +19,8 @@ vi.mock('lucide-react', () => ({
   ChevronRight: () => <div>RightIcon</div>,
   Calendar: () => <div>CalendarIcon</div>,
   RefreshCcw: () => <div>RefreshIcon</div>,
-  FileText: () => <div>FileTextIcon</div>
+  FileText: () => <div>FileTextIcon</div>,
+  Download: () => <div>DownloadIcon</div>
 }));
 
 const mockPayments = {

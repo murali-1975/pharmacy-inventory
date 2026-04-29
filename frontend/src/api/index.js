@@ -354,6 +354,21 @@ export const api = {
       const res = await fetch(url, { headers: getHeaders(token) });
       return handleResponse(res);
     },
+
+    exportPatientPayments: async (token, patientName = '', date = '', fromDate = '', toDate = '') => {
+      let url = `${API_BASE}/finance/reports/payments/excel?`;
+      const params = new URLSearchParams();
+      if (patientName) params.append('patient_name', patientName);
+      if (date) params.append('date', date);
+      if (fromDate) params.append('from_date', from_date);
+      if (toDate) params.append('to_date', to_date);
+      url += params.toString();
+
+      const res = await fetch(url, { headers: getHeaders(token) });
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (!res.ok) throw new Error('Failed to export payments');
+      return res.blob();
+    },
   
     getFinanceDashboardStats: async (token, start = '', end = '') => {
       let url = `${API_BASE}/finance/analytics/dashboard`;

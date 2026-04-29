@@ -207,6 +207,7 @@ def create_patient_payment(
         db.refresh(db_payment)
         return db_payment
 
+
 @router.get("/payments", response_model=schemas.PaginatedPatientPayment)
 def get_patient_payments(
     skip: int = Query(0, ge=0),
@@ -237,6 +238,96 @@ def get_patient_payments(
         .all()
     )
     return {"total": total, "items": items}
+
+@router.get("/reports/payments/excel")
+def export_patient_payments_excel(
+    patient_name: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Exports ALL patient payments matching the filters to an Excel file,
+    bypassing the pagination used in the UI list view.
+    """
+    query = db.query(models.PatientPayment).filter(models.PatientPayment.is_deleted == False)
+    
+    if patient_name:
+        query = query.filter(models.PatientPayment.patient_name.ilike(f"%{patient_name}%"))
+    if date:
+        query = query.filter(models.PatientPayment.payment_date == date)
+    if from_date:
+        query = query.filter(models.PatientPayment.payment_date >= from_date)
+    if to_date:
+        query = query.filter(models.PatientPayment.payment_date <= to_date)
+
+    # Get all matching records (unpaginated)
+    records = query.order_by(models.PatientPayment.payment_date.desc(), models.PatientPayment.id.desc()).all()
+
+    data = []
+    for r in records:
+        # Calculate balance
+        total_paid = sum(p.value for p in r.payments) if r.payments else 0
+        balance = r.total_amount - total_paid
+        
+        # Format identifiers
+        ids = ", ".join([ident.id_value for ident in r.identifiers]) if r.identifiers else "N/A"
+        
+        # Format services
+        services = ", ".join([s.service.service_name for s in r.services]) if r.services else "N/A"
+
+        data.append({
+            "Date": r.payment_date.strftime("%d-%m-%Y") if r.payment_date else "N/A",
+            "Patient Name": r.patient_name,
+            "Token No": r.token_no or "N/A",
+            "Identifiers": ids,
+            "Services": services,
+            "Total Amount": float(r.total_amount),
+            "Paid Amount": float(total_paid),
+            "Balance": float(balance),
+            "Status": r.payment_status or "PAID",
+            "Notes": r.notes or ""
+        })
+
+    df = pd.DataFrame(data)
+    
+    # Create Excel in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter', date_format='dd-mm-yyyy', datetime_format='dd-mm-yyyy') as writer:
+        df.to_excel(writer, index=False, sheet_name='Patient Payments')
+        workbook = writer.book
+        worksheet = writer.sheets['Patient Payments']
+        
+        # Formatting
+        header_format = workbook.add_format({
+            'bold': True, 'bg_color': '#1E293B', 'font_color': 'white', 'border': 1
+        })
+        currency_format = workbook.add_format({'num_format': '₹#,##0.00'})
+        date_format = workbook.add_format({'num_format': 'dd-mm-yyyy'})
+        
+        # Write headers with format
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+        # Set column widths
+        worksheet.set_column('A:A', 12, date_format) # Date
+        worksheet.set_column('B:B', 25) # Patient Name
+        worksheet.set_column('C:C', 10) # Token No
+        worksheet.set_column('D:E', 30) # Identifiers, Services
+        worksheet.set_column('F:H', 15, currency_format) # Amounts
+        worksheet.set_column('I:I', 12) # Status
+        worksheet.set_column('J:J', 30) # Notes
+
+    output.seek(0)
+    
+    filename = f"Patient_Payments_{datetime.datetime.now().strftime('%d_%m_%Y')}.xlsx"
+    return Response(
+        output.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @router.get("/payments/{id}", response_model=schemas.PatientPaymentSchema)
 def get_patient_payment(
