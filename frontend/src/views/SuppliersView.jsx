@@ -34,7 +34,7 @@ const SuppliersView = ({
           <h1 className="text-2xl font-bold text-gray-900">Supplier Directory</h1>
           <p className="text-gray-500">Manage your verified vendor network</p>
         </div>
-        {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && (
+        {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager' || currentUser?.role === 'Staff') && (
           <button 
             onClick={onAddClick}
             className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all active:scale-95 flex items-center justify-center space-x-2"
@@ -108,7 +108,7 @@ const SuppliersView = ({
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end space-x-3">
-                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && (
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager' || currentUser?.role === 'Staff') && (
                         <button 
                           onClick={() => onEditClick(supplier)}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"

@@ -1,7 +1,7 @@
 """
 Supplier Management Router.
 Handles CRUD operations for suppliers, including their associated contact and bank details.
-Access: All authenticated users (Read), Admin/Manager (Create/Update), Admin (Delete).
+Access: All authenticated users (Read), Admin/Manager/Staff (Create/Update), Admin (Delete).
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -13,6 +13,7 @@ from app.core.logging_config import logger
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
 admin_manager_required = auth.RoleChecker(["Admin", "Manager"])
+admin_manager_staff_required = auth.RoleChecker(["Admin", "Manager", "Staff"])
 admin_required = auth.RoleChecker(["Admin"])
 
 @router.get("/", response_model=List[schemas.SupplierSchema])
@@ -29,11 +30,11 @@ def get_suppliers(db: Session = Depends(database.get_db), current_user: models.U
 def create_supplier(
     supplier_in: schemas.SupplierCreate, 
     db: Session = Depends(database.get_db), 
-    current_user: models.User = Depends(admin_manager_required)
+    current_user: models.User = Depends(admin_manager_staff_required)
 ):
     """
     Create a new supplier with optional nested contact and bank details.
-    Requires: Admin or Manager role.
+    Requires: Admin, Manager or Staff role.
     """
     with utils.db_error_handler("supplier creation", db):
         db_supplier = models.Supplier(
@@ -70,11 +71,11 @@ def update_supplier(
     supplier_id: int, 
     supplier_in: schemas.SupplierCreate, 
     db: Session = Depends(database.get_db), 
-    current_user: models.User = Depends(admin_manager_required)
+    current_user: models.User = Depends(admin_manager_staff_required)
 ):
     """
     Update an existing supplier and its associated details.
-    Requires: Admin or Manager role.
+    Requires: Admin, Manager or Staff role.
     Logic: Syncs contact details and rebuilds bank account list.
     """
     with utils.db_error_handler(f"supplier update (ID: {supplier_id})", db):

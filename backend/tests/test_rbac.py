@@ -40,6 +40,20 @@ def test_manager_cannot_access_users(clean_overrides):
         response = client.get("/users/")
         assert response.status_code == 403
 
+def test_staff_can_update_supplier_access(clean_overrides):
+    app.dependency_overrides[get_current_user] = get_user_override("Staff")
+    with TestClient(app) as client:
+        # Staff should be able to update (PUT)
+        # Using a dummy payload and ID
+        response = client.put("/suppliers/9999", json={
+            "supplier_name": "Test",
+            "type_id": 1,
+            "status_id": 1,
+            "contact_details": None,
+            "bank_details": []
+        })
+        assert response.status_code != 403
+
 def test_staff_cannot_delete_supplier(clean_overrides):
     app.dependency_overrides[get_current_user] = get_user_override("Staff")
     with TestClient(app) as client:
