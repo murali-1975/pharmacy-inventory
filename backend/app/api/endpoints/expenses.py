@@ -27,6 +27,16 @@ def record_expense(
     Records a new operational expense with optional split payments.
     """
     logger.info(f"Initiating expense record for User: {current_user.username}")
+    
+    # Permission check: Non-admins cannot record 'Salary' expenses
+    if current_user.role != 'Admin':
+        exp_type = db.query(models.ExpenseType).filter(models.ExpenseType.id == exp_in.expense_type_id).first()
+        if exp_type and exp_type.name == 'Salary':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Staff users are not authorized to record salary expenses."
+            )
+
     with utils.db_error_handler("recording expense", db):
         db_expense = ExpenseService.record_expense(db, exp_in, current_user.id)
         db.commit()
@@ -49,6 +59,10 @@ def list_expenses(
     """
     logger.debug(f"Listing expenses: skip={skip}, limit={limit}")
     query = db.query(models.Expense).filter(models.Expense.is_deleted == False)
+    
+    # Permission check: Hide 'Salary' expenses from non-admins
+    if current_user.role != 'Admin':
+        query = query.join(models.ExpenseType).filter(models.ExpenseType.name != 'Salary')
     
     if expense_type_id:
         query = query.filter(models.Expense.expense_type_id == expense_type_id)
@@ -127,10 +141,16 @@ def get_expense(
     """
     Retrieves detailed information for a specific expense record.
     """
-    exp = db.query(models.Expense).filter(
+    query = db.query(models.Expense).filter(
         models.Expense.id == id, 
         models.Expense.is_deleted == False
-    ).first()
+    )
+    
+    # Permission check: Hide 'Salary' expenses from non-admins
+    if current_user.role != 'Admin':
+        query = query.join(models.ExpenseType).filter(models.ExpenseType.name != 'Salary')
+        
+    exp = query.first()
     
     if not exp:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense record not found.")

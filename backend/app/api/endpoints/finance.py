@@ -184,6 +184,10 @@ def get_finance_masters(
         query_modes = query_modes.filter(models.PaymentModeMaster.is_active == True)
         query_exps = query_exps.filter(models.ExpenseType.is_active == True)
 
+    # Permission check: Hide 'Salary' category from non-admins
+    if current_user.role != 'Admin':
+        query_exps = query_exps.filter(models.ExpenseType.name != 'Salary')
+
     return {
         "identifiers": query_ids.all(),
         "services": query_srvs.all(),
@@ -438,16 +442,42 @@ def get_daily_summaries(
         grand_total["total_revenue"] += s.total_revenue
         grand_total["total_collected"] += s.total_collected
         grand_total["total_gst"] += s.total_gst
-        grand_total["total_expenses"] += s.total_expenses
+        
+        # Permission check for expenses
+        salary_amt = s.expense_breakdown.get('Salary', 0.0) if s.expense_breakdown else 0.0
+        if current_user.role != 'Admin':
+            grand_total["total_expenses"] += (s.total_expenses - salary_amt)
+        else:
+            grand_total["total_expenses"] += s.total_expenses
+            
         grand_total["total_expense_gst"] += s.total_expense_gst
         
         for name, amt in s.service_breakdown.items():
             grand_total["service_breakdown"][name] = grand_total["service_breakdown"].get(name, 0.0) + amt
         for mode, amt in s.payment_breakdown.items():
             grand_total["payment_breakdown"][mode] = grand_total["payment_breakdown"].get(mode, 0.0) + amt
+            
         if s.expense_breakdown:
             for etype, amt in s.expense_breakdown.items():
+                if current_user.role != 'Admin' and etype == 'Salary':
+                    continue
                 grand_total["expense_breakdown"][etype] = grand_total["expense_breakdown"].get(etype, 0.0) + amt
 
     items = all_summaries[skip : skip + limit]
+    
+    # Permission check: Hide 'Salary' from individual summary items for non-admins
+    if current_user.role != 'Admin':
+        filtered_items = []
+        for item in items:
+            s_amt = item.expense_breakdown.get('Salary', 0.0) if item.expense_breakdown else 0.0
+            if s_amt > 0:
+                # Convert to dict and modify to avoid ORM side effects
+                item_dict = schemas.DailyFinanceSummarySchema.model_validate(item).model_dump()
+                item_dict['total_expenses'] -= s_amt
+                item_dict['expense_breakdown'].pop('Salary', None)
+                filtered_items.append(item_dict)
+            else:
+                filtered_items.append(item)
+        items = filtered_items
+
     return {"total": total, "items": items, "grand_total": grand_total}
